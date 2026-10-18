@@ -121,7 +121,8 @@ const PLAYER_STATS = `https://site.web.api.espn.com/apis/common/v3/sports/basket
 
 async function rosters(standings) {
   const old = await readJSON('data/plantillas.json', null);
-  if (old && Date.now() - new Date(old.updated).getTime() < FULL_EVERY_MS) return;
+  const hasLeaders = await readJSON('data/lideres.json', null);
+  if (old && hasLeaders && Date.now() - new Date(old.updated).getTime() < FULL_EVERY_MS) return;
 
   const ps = await get(PLAYER_STATS);
   const idx = {};
@@ -154,6 +155,60 @@ async function rosters(standings) {
   const season = ps.requestedSeason ? ps.requestedSeason.displayName : '';
   await writeJSON('data/plantillas.json', { updated: new Date().toISOString(), season, teams }, 0);
   console.log('plantillas:', Object.keys(teams).length, 'equipos, estadísticas de', season);
+  await leaders(ps, val, season);
+}
+
+// Líderes de la temporada (top 10) de jugadores y equipos.
+// Eficiencia (EFF de la NBA) = PTS + REB + AST + ROB + TAP - tiros fallados - libres fallados - pérdidas, por partido.
+const TEAM_STATS = `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/statistics/byteam?season=2027&seasontype=2&limit=50`;
+const LEADER_CATS = [
+  ['pts', 'Puntos totales'], ['ppg', 'Puntos por partido'], ['apg', 'Asistencias por partido'],
+  ['rpg', 'Rebotes por partido'], ['eff', 'Eficiencia por partido'], ['spg', 'Robos por partido'],
+];
+const r1 = v => Math.round(v * 10) / 10;
+const eff = x => x.ppg + x.rpg + x.apg + x.spg + x.bpg - (x.fga - x.fgm) - (x.fta - x.ftm) - x.tov;
+
+async function leaders(ps, val, season) {
+  // jugadores: para las medias hay que haber jugado al menos el 70 % de los partidos del que más ha jugado
+  const pl = ps.athletes.map(a => {
+    const x = {
+      id: a.athlete.id, n: a.athlete.displayName, t: a.athlete.teamShortName || '', gp: val(a, 'gamesPlayed'),
+      pts: val(a, 'points'), ppg: val(a, 'avgPoints'), apg: val(a, 'avgAssists'), rpg: val(a, 'avgRebounds'),
+      spg: val(a, 'avgSteals'), bpg: val(a, 'avgBlocks'), tov: val(a, 'avgTurnovers'),
+      fgm: val(a, 'avgFieldGoalsMade'), fga: val(a, 'avgFieldGoalsAttempted'), ftm: val(a, 'avgFreeThrowsMade'), fta: val(a, 'avgFreeThrowsAttempted'),
+    };
+    x.eff = eff(x);
+    return x;
+  });
+  const maxGp = Math.max(1, ...pl.map(x => x.gp));
+  const minGp = Math.max(1, Math.ceil(maxGp * 0.7));
+  const players = {};
+  for (const [k] of LEADER_CATS) {
+    const pool = k === 'pts' ? pl : pl.filter(x => x.gp >= minGp);
+    players[k] = pool.sort((a, b) => b[k] - a[k]).slice(0, 10).map(x => ({ id: x.id, n: x.n, t: x.t, gp: x.gp, v: k === 'pts' ? x.pts : r1(x[k]) }));
+  }
+
+  // equipos
+  const ts = await get(TEAM_STATS);
+  const tidx = {};
+  ts.categories.forEach(c => (c.names || []).forEach((n, i) => tidx[c.name + ':' + n] ??= i));
+  const tval = (t, cat, n) => { const c = t.categories.find(x => x.name === cat && x.splitId === '0'); const i = tidx[cat + ':' + n]; return c && i != null ? +c.values[i] : 0; };
+  const tl = ts.teams.map(t => {
+    const x = {
+      t: t.team.abbreviation, gp: tval(t, 'general', 'gamesPlayed'),
+      pts: tval(t, 'offensive', 'points'), ppg: tval(t, 'offensive', 'avgPoints'), apg: tval(t, 'offensive', 'avgAssists'),
+      rpg: tval(t, 'general', 'avgRebounds'), spg: tval(t, 'defensive', 'avgSteals'), bpg: tval(t, 'defensive', 'avgBlocks'),
+      tov: tval(t, 'offensive', 'avgTurnovers'), fgm: tval(t, 'offensive', 'avgFieldGoalsMade'), fga: tval(t, 'offensive', 'avgFieldGoalsAttempted'),
+      ftm: tval(t, 'offensive', 'avgFreeThrowsMade'), fta: tval(t, 'offensive', 'avgFreeThrowsAttempted'),
+    };
+    x.eff = eff(x);
+    return x;
+  });
+  const teams = {};
+  for (const [k] of LEADER_CATS) teams[k] = tl.sort((a, b) => b[k] - a[k]).slice(0, 10).map(x => ({ t: x.t, gp: x.gp, v: k === 'pts' ? x.pts : r1(x[k]) }));
+
+  await writeJSON('data/lideres.json', { updated: new Date().toISOString(), season, minGp, cats: LEADER_CATS, players, teams }, 0);
+  console.log('líderes de', season, '· mínimo', minGp, 'partidos · máx. anotador:', players.ppg[0] && players.ppg[0].n, players.ppg[0] && players.ppg[0].v);
 }
 
 // Copia de seguridad de la estadística de cada partido terminado: data/partidos/<id>.json.

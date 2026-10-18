@@ -24,8 +24,8 @@ h2{font-size:16px;margin:28px 0 10px;color:var(--mute);text-transform:uppercase;
 nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
 nav button,.pill{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font:inherit;cursor:pointer}
 .ls{display:none}
-@media (max-width:480px){nav{display:grid;grid-template-columns:repeat(5,auto);gap:4px}nav button{padding:8px 4px;font-size:12px;white-space:nowrap}}
-@media (max-width:400px){.lf{display:none}.ls{display:inline}}
+@media (max-width:520px){.lf{display:none}.ls{display:inline}nav{display:grid;grid-template-columns:repeat(6,auto);gap:4px}nav button{padding:6px 5px;font-size:12px;line-height:1.15;white-space:nowrap;min-height:40px}}
+@media (max-width:385px){nav{gap:3px}nav button{padding:6px 3px;font-size:11px}}
 @media (max-width:600px){
   .news{grid-template-columns:1fr;gap:8px}
   .news a.art{flex-direction:row}
@@ -152,6 +152,21 @@ details.inj p{margin:8px 0 0;font-size:13px;line-height:1.45}
 .bi{position:relative}
 .bi .hurt{position:absolute;right:-2px;top:-2px;width:16px;height:16px;border-radius:50%;background:var(--accent);color:#fff;font:800 13px/16px system-ui;font-style:normal;text-align:center}
 .bi .hurt.out{background:var(--bad)}
+.leads{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.lead{padding:12px 14px}
+.lead h3{margin:0 0 6px;font-size:15px}
+.lead ol{list-style:none;margin:0;padding:0}
+.lead li{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--line)}
+.lead li:first-child{border-top:0}
+.lead .lr{width:18px;text-align:right;color:var(--mute);font-size:12px;font-variant-numeric:tabular-nums}
+.lead .lh{width:34px;height:34px;border-radius:50%;object-fit:cover;object-position:50% 15%;background:var(--card2);flex:none}
+.lead .lt img{width:30px;height:30px;object-fit:contain;display:block}
+.lead .ln{flex:1;min-width:0}
+.lead .ln b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lead .ln small{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--mute)}
+.lead .ln small img{width:14px;height:14px;object-fit:contain}
+.lead .lv{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+.lead li.top .lv{color:var(--accent);font-size:18px}
 .calbar select{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:7px 12px;font:inherit;max-width:100%}
 .news{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
 a.art{display:flex;flex-direction:column;padding:0;overflow:hidden;color:inherit;text-decoration:none}
@@ -216,7 +231,7 @@ h2.tn img{width:28px;height:28px;object-fit:contain}
    están en data/apuestas.json, compartidos con scripts/update.mjs.
    ============================================================ */
 let PLAYERS = {}, RESULTS = {};
-let CAL = null, HIST = null, PLANT = null;   // data/calendario.json y data/historial.json (GitHub Actions)
+let CAL = null, HIST = null, PLANT = null, LEAD = null;   // data/calendario.json y data/historial.json (GitHub Actions)
 
 const NAMES = {
   doncic:'Luka Dončić', duren:'Jalen Duren', mamukelashvili:'Sandro Mamukelashvili', sexton:'Collin Sexton',
@@ -732,7 +747,7 @@ function viewInj(){
 }
 
 /* ---------- noticias (ESPN, en inglés) ---------- */
-let newsTeam='', newsMode='news', NEWS={key:null,at:0,items:null,err:false,loading:false};
+let newsTeam='', newsMode='inj', NEWS={key:null,at:0,items:null,err:false,loading:false};
 const esc=x=>String(x??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function ago(iso){
   const m=Math.round((Date.now()-new Date(iso))/60000);
@@ -755,7 +770,7 @@ async function loadNews(){
 function viewNews(){
   const opts=Object.values(TEAMS).sort((a,b)=>a.name.localeCompare(b.name))
     .map(t=>`<option value="${t.abbr}" ${t.abbr===newsTeam?'selected':''}>${t.name}</option>`).join('');
-  let h=`<div class="calbar"><button class="pill ${newsMode==='news'?'on':''}" data-nm="news">📰 Noticias</button><button class="pill ${newsMode==='inj'?'on':''}" data-nm="inj">🩹 Lesiones</button></div>
+  let h=`<div class="calbar"><button class="pill ${newsMode==='inj'?'on':''}" data-nm="inj">🩹 Lesiones</button><button class="pill ${newsMode==='news'?'on':''}" data-nm="news">📰 Noticias</button></div>
     <div class="calbar"><select id="newsteam"><option value="">Todos los equipos${newsMode==='news'?' (últimas 50)':''}</option>${opts}</select>
     ${newsTeam?`<span class="team">${logo(newsTeam)}</span>`:''}</div>`;
   if(newsMode==='inj') return h+viewInj();
@@ -774,7 +789,25 @@ function viewNews(){
   }).join('')+'</div>';
 }
 
-const TABS={general:['Marcador',viewGeneral],comp:['Clasificación',viewComp,'Clasif.'],player:['Jugadores',viewPlayer],cal:['Calendario',viewCal],news:['Noticias',viewNews]};
+/* ---------- líderes de la temporada (data/lideres.json, GitHub Actions) ---------- */
+let leadMode='players';
+function viewLeaders(){
+  if(!LEAD) return '<p class="sub">Cargando líderes…</p>';
+  const cur=LEAD.season==='2026-27';
+  const pickers=id=>{const by=pickedBy(id); return [...new Set(by.map(x=>x.n))];};
+  let h=`<div class="calbar"><button class="pill ${leadMode==='players'?'on':''}" data-lm="players">Jugadores</button><button class="pill ${leadMode==='teams'?'on':''}" data-lm="teams">Equipos</button></div>
+    <p class="sub">Temporada ${LEAD.season}${cur?'':' (la pasada: la actual todavía no tiene partidos)'}. ${leadMode==='players'?`Para las medias hay que haber jugado al menos ${LEAD.minGp} partidos (70 % del máximo). La cara indica quién lo apostó en premios.`:''} Eficiencia = PTS + REB + AST + ROB + TAP − tiros fallados − libres fallados − pérdidas, por partido.</p><div class="leads">`;
+  for(const [k,title] of LEAD.cats){
+    const rows=(leadMode==='players'?LEAD.players:LEAD.teams)[k]||[];
+    h+=`<div class="card lead"><h3>${title}</h3><ol>`+rows.map((x,i)=>leadMode==='players'
+      ?`<li class="${i===0?'top':''}"><span class="lr">${i+1}</span><img class="lh" src="https://a.espncdn.com/i/headshots/nba/players/full/${x.id}.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+          <span class="ln"><b>${esc(x.n)}</b><small>${x.t?logo(x.t)+x.t:''} · ${x.gp} PJ</small></span>${fanImgs(pickers(x.id))}<span class="lv">${x.v}</span></li>`
+      :`<li class="${i===0?'top':''}"><span class="lr">${i+1}</span><span class="lt">${logo(x.t)}</span><span class="ln"><b>${tname(x.t)}</b><small>${x.gp} PJ</small></span><span class="lv">${x.v}</span></li>`).join('')+'</ol></div>';
+  }
+  return h+'</div>';
+}
+
+const TABS={general:['Inicio',viewGeneral],comp:['Clasificación',viewComp,'Clasif.'],player:['Jugadores',viewPlayer,'Jug.'],cal:['Calendario',viewCal],news:['Lesiones/Noticias',viewNews,'Lesiones/<br>Noticias'],lead:['Líderes',viewLeaders]};
 
 function render(){
   $('#tabs').innerHTML=Object.entries(TABS).map(([k,v])=>`<button data-t="${k}" class="${k===tab?'on':''}">${v[2]?`<span class="lf">${v[0]}</span><span class="ls">${v[2]}</span>`:v[0]}</button>`).join('');
@@ -785,6 +818,7 @@ document.addEventListener('click',e=>{
   if(t){tab=t.dataset.t;openGame=null;render();}
   else if(gm){openGame=gm.dataset.game;render();window.scrollTo(0,0);}
   else if(bk){openGame=null;render();}
+  else if(e.target.closest('[data-lm]')){leadMode=e.target.closest('[data-lm]').dataset.lm;render();}
   else if(e.target.closest('[data-nm]')){newsMode=e.target.closest('[data-nm]').dataset.nm;render();}
   else if(p){selPlayer=p.dataset.p;render();}
   else if(c){const n=+c.dataset.cal; calDay=n?addDays(calDay,n):dayIn(US); openGame=null; render();}
@@ -812,8 +846,8 @@ async function loadRepoData(){
     if(a){PLAYERS=a.players; RESULTS=a.results; names=Object.keys(PLAYERS); selPlayer=names[0];}
   }
   const calOld=!CAL||Date.now()-calAt>600000;   // el calendario pesa: cada 10 min basta
-  const [c,h,pl]=await Promise.all([calOld?get('data/calendario.json'):null,get('data/historial.json'),calOld?get('data/plantillas.json'):null]);
-  if(c){CAL=c; calAt=Date.now();} if(h) HIST=h; if(pl) PLANT=pl;
+  const [c,h,pl,ld]=await Promise.all([calOld?get('data/calendario.json'):null,get('data/historial.json'),calOld?get('data/plantillas.json'):null,calOld?get('data/lideres.json'):null]);
+  if(c){CAL=c; calAt=Date.now();} if(h) HIST=h; if(pl) PLANT=pl; if(ld) LEAD=ld;
 }
 let calAt=0;
 

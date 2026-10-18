@@ -40,10 +40,12 @@ Web estática para seguir en directo la apuesta de la temporada entre 4 amigos: 
 2. Calcula los puntos de cada participante en el navegador. No hay servidor.
 3. Guarda la última respuesta en `localStorage`. Si ESPN falla, muestra esos datos con un aviso.
 4. Pestañas:
-   - **Marcador:** tarjetas, cartel de la cena, gráfico de evolución y tabla de bonus.
+   - **Inicio:** gráfico de evolución, clasificación de los 4, cartel de la cena y resumen de bonus.
    - **Comparativa y clasificación:** Este y Oeste con PJ, G, P, racha, últimos 10 y la apuesta de cada uno.
-   - **Por jugador.**
-   - **Calendario:** selector de día con ◀ ▶, fecha y "Hoy".
+   - **Jugadores** (en el móvil, "Jug.").
+   - **Calendario:** selector de día con ◀ ▶, fecha y "Hoy". Al tocar un partido se abre su ficha.
+   - **Lesiones/Noticias.**
+   - **Líderes.**
 
 La clasificación solo cambia cuando **termina** un partido. No es en directo jugada a jugada.
 
@@ -115,12 +117,23 @@ node scripts/update.mjs       # actualizar los datos a mano (necesita Node 18+)
 
 ## Noticias
 
-- **Origen:** pestaña con las últimas 50 noticias de ESPN, en inglés. Se piden directamente desde el navegador y se guardan 10 minutos en memoria. No ocupan espacio en el repo.
+- **Origen:** dentro de la pestaña Lesiones/Noticias, botón 📰 Noticias, con las últimas 50 noticias de ESPN, en inglés. Se piden directamente desde el navegador y se guardan 10 minutos en memoria. No ocupan espacio en el repo.
   - Todas: `site.api.espn.com/apis/site/v2/sports/basketball/nba/news?limit=50`.
   - Un equipo: `...&team=<id de ESPN>`, que se elige en el desplegable. El id sale de la clasificación (`TEAMS[abbr].id`).
 - **Cada noticia** muestra foto, titular, entradilla, escudos de los equipos relacionados y "hace X h". Al tocarla se abre en ESPN. Los vídeos se marcan con "▶ Vídeo".
 - **Sin filtro por jugador:** la API lo ignora. Lo probamos con `athlete`, `athletes`, `athleteId` y `player`, y `athletes/<id>/news` da error.
 - **En español:** existe con `&lang=es&region=us` (ESPN Deportes), pero se eligió inglés porque hay más noticias y llegan antes.
+
+## Líderes
+
+- **Origen:** la pestaña Líderes muestra el top 10 de jugadores y de equipos en puntos totales, puntos, asistencias, rebotes, eficiencia y robos por partido.
+  - Sale de `data/lideres.json`, unos 6 KB.
+  - Lo calcula el script cada 6 horas, junto con las plantillas.
+- **Jugadores:** usa el mismo `byathlete` que las plantillas. Para las medias hay que haber jugado al menos el 70 % de los partidos del que más ha jugado, que es la regla aproximada de la NBA. Los puntos totales no tienen mínimo.
+- **Equipos:** `site.web.api.espn.com/apis/common/v3/sports/basketball/nba/statistics/byteam?season=2027&seasontype=2`. Hay que coger las categorías con `splitId: "0"`, las propias; el `900` es la del rival.
+- **Eficiencia:** no viene en la API. Se calcula como la EFF de la NBA: PTS + REB + AST + ROB + TAP − tiros fallados − libres fallados − pérdidas, por partido.
+- **Apuestas:** los jugadores apostados en premios salen con la cara de quien los apostó.
+- **Temporada:** igual que las plantillas, mientras 2026-27 no tenga partidos se muestra 2025-26, y la web lo indica.
 
 ## Lesiones
 
@@ -130,9 +143,9 @@ node scripts/update.mjs       # actualizar los datos a mano (necesita Node 18+)
   - El id del jugador no viene suelto: se saca de su enlace (`/id/<n>/`).
 - **Orden:** siempre de más a menos importante, según los puntos por partido de `data/plantillas.json`. Los que no tienen datos van al final.
 - **Dónde se ve:**
-  1. **Noticias → 🩹 Lesiones:** el parte completo, con el mismo filtro de equipo que las noticias, o todos. Al tocar un jugador se abre el comentario.
+  1. **Lesiones/Noticias → 🩹 Lesiones** (se abre por defecto): el parte completo, con el mismo filtro de equipo que las noticias, o todos. Al tocar un jugador se abre el comentario.
   2. **Ficha de cada partido no terminado:** "Lesionados" de cada equipo. En la plantilla, la etiqueta baja/duda también sale del parte en directo.
-  3. **Marcador → Resumen bonus:** aviso "Lesionados entre vuestras apuestas" con quién apostó a cada uno. Además, en la cuadrícula de fotos, una cruz roja marca una baja y una naranja una duda.
+  3. **Inicio → Resumen bonus:** aviso "Lesionados entre vuestras apuestas" con quién apostó a cada uno. Además, en la cuadrícula de fotos, una cruz roja marca una baja y una naranja una duda.
 - **Ids de los jugadores apostados:** están en `PICK_ESPN`, en `index.html`. Si cambia algún premio apostado, hay que añadir su id ahí.
 - **Traducción:** las zonas del cuerpo se traducen con `BODY_ES`. Si sale alguna en inglés, hay que añadirla ahí.
 
