@@ -113,6 +113,15 @@ node scripts/update.mjs       # actualizar los datos a mano (necesita Node 18+)
 - El orden de equipos usa `playoffSeed` de ESPN, con desempate por porcentaje de victorias y diferencia de puntos.
 - Se quitó el pie de créditos de las fotos a petición del usuario. Las fotos de Wikimedia con licencia CC BY piden atribución si la web se difunde de forma abierta.
 
+## Noticias
+
+- **Origen:** pestaña con las últimas 50 noticias de ESPN, en inglés. Se piden directamente desde el navegador y se guardan 10 minutos en memoria. No ocupan espacio en el repo.
+  - Todas: `site.api.espn.com/apis/site/v2/sports/basketball/nba/news?limit=50`.
+  - Un equipo: `...&team=<id de ESPN>`, que se elige en el desplegable. El id sale de la clasificación (`TEAMS[abbr].id`).
+- **Cada noticia** muestra foto, titular, entradilla, escudos de los equipos relacionados y "hace X h". Al tocarla se abre en ESPN. Los vídeos se marcan con "▶ Vídeo".
+- **Sin filtro por jugador:** la API lo ignora. Lo probamos con `athlete`, `athletes`, `athleteId` y `player`, y `athletes/<id>/news` da error.
+- **En español:** existe con `&lang=es&region=us` (ESPN Deportes), pero se eligió inglés porque hay más noticias y llegan antes.
+
 ## Ficha de cada partido (Calendario)
 
 Al tocar un partido se abre su ficha, con "← Volver a la jornada" para salir.

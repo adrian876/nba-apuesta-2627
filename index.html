@@ -23,7 +23,18 @@ h2{font-size:16px;margin:28px 0 10px;color:var(--mute);text-transform:uppercase;
 .status.err{color:var(--warn)}
 nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
 nav button,.pill{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font:inherit;cursor:pointer}
-@media (max-width:480px){nav{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}nav button{padding:8px 2px;font-size:12.5px;white-space:nowrap}}
+.ls{display:none}
+@media (max-width:480px){nav{display:grid;grid-template-columns:repeat(5,auto);gap:4px}nav button{padding:8px 4px;font-size:12px;white-space:nowrap}}
+@media (max-width:400px){.lf{display:none}.ls{display:inline}}
+@media (max-width:600px){
+  .news{grid-template-columns:1fr;gap:8px}
+  .news a.art{flex-direction:row}
+  .news .art .ai{aspect-ratio:auto;width:112px;flex:none;min-height:100px}
+  .news .art .at{padding:10px 12px;gap:4px;min-width:0}
+  .news .art .at b{font-size:14px}
+  .news .art .at p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12px}
+  .news .art .vid{font-size:10px;padding:2px 6px;left:6px;bottom:6px}
+}
 nav button.on,.pill.on{background:var(--accent);color:#111;border-color:var(--accent);font-weight:600}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
@@ -120,6 +131,18 @@ th .av{width:30px;height:30px;display:block;margin:0 auto 3px}
 .gt b{font-size:18px;font-variant-numeric:tabular-nums}
 .gt.lose{opacity:.55}
 .gn{font-size:11px;color:var(--accent);margin-top:6px}
+.calbar select{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:7px 12px;font:inherit;max-width:100%}
+.news{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+a.art{display:flex;flex-direction:column;padding:0;overflow:hidden;color:inherit;text-decoration:none}
+a.art:hover{border-color:var(--accent)}
+.art .ai{aspect-ratio:3/2;background-size:cover;background-position:center;position:relative}
+.art .vid{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.75);color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px}
+.art .at{padding:12px 14px;display:flex;flex-direction:column;gap:6px;flex:1}
+.art .at b{font-size:15px;line-height:1.3}
+.art .at p{margin:0;font-size:13px;color:var(--mute);line-height:1.4}
+.art .am{display:flex;align-items:center;gap:6px;margin-top:auto;font-size:12px;color:var(--mute)}
+.art .am img{width:20px;height:20px;object-fit:contain}
+.art .am span{margin-left:auto}
 button.game{display:block;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer}
 button.game:hover{border-color:var(--accent)}
 .gs .more{margin-left:auto;color:var(--accent);font-weight:600}
@@ -217,7 +240,7 @@ function parse(data){
     const list = ch.standings.entries.map(e=>{
       const s = {}; e.stats.forEach(x=>s[x.name]=x.displayValue);
       const w = +s.wins||0, l = +s.losses||0;
-      return { abbr:e.team.abbreviation, name:e.team.displayName,
+      return { id:e.team.id, abbr:e.team.abbreviation, name:e.team.displayName,
         logo:(e.team.logos&&e.team.logos[0]&&e.team.logos[0].href)||'', conf,
         seed:+s.playoffSeed||99, w, l, gp:w+l, pct:+s.winPercent||0, diff:+s.pointDifferential||0,
         streak:s.streak||'-', l10:s['Last Ten Games']||'-' };
@@ -605,10 +628,51 @@ function viewPlayer(){
   return h+'</table></div>';
 }
 
-const TABS={general:['Marcador',viewGeneral],comp:['Clasificación',viewComp],player:['Jugadores',viewPlayer],cal:['Calendario',viewCal]};
+/* ---------- noticias (ESPN, en inglés) ---------- */
+let newsTeam='', NEWS={key:null,at:0,items:null,err:false,loading:false};
+const esc=x=>String(x??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function ago(iso){
+  const m=Math.round((Date.now()-new Date(iso))/60000);
+  if(m<60) return `hace ${Math.max(1,m)} min`;
+  const h=Math.round(m/60); if(h<24) return `hace ${h} h`;
+  const d=Math.round(h/24); return d<7?`hace ${d} ${d===1?'día':'días'}`:new Date(iso).toLocaleDateString('es-ES',{day:'numeric',month:'short'});
+}
+async function loadNews(){
+  const key=newsTeam;
+  if(NEWS.loading||(NEWS.key===key&&NEWS.items&&Date.now()-NEWS.at<600000)) return;   // 10 min de caché
+  NEWS={...NEWS,key,loading:true};
+  const id=key&&TEAMS[key]?TEAMS[key].id:'';
+  try{
+    const r=await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/news?limit=50'+(id?'&team='+id:''),{cache:'no-store'});
+    const d=await r.json();
+    NEWS={key,at:Date.now(),items:d.articles||[],err:false,loading:false};
+  }catch(e){ NEWS={key,at:Date.now(),items:null,err:true,loading:false}; }
+  if(tab==='news') render();
+}
+function viewNews(){
+  const opts=Object.values(TEAMS).sort((a,b)=>a.name.localeCompare(b.name))
+    .map(t=>`<option value="${t.abbr}" ${t.abbr===newsTeam?'selected':''}>${t.name}</option>`).join('');
+  let h=`<div class="calbar"><select id="newsteam"><option value="">Todos los equipos (últimas 50)</option>${opts}</select>
+    ${newsTeam?`<span class="team">${logo(newsTeam)}</span>`:''}</div>
+    <p class="sub">Noticias de ESPN (en inglés). Toca una para leerla completa en ESPN.</p>`;
+  if(NEWS.key!==newsTeam||!NEWS.items){ loadNews(); return h+`<p class="sub">${NEWS.err&&NEWS.key===newsTeam?'No se pudieron cargar las noticias de ESPN.':'Cargando noticias…'}</p>`; }
+  loadNews();
+  if(!NEWS.items.length) return h+'<div class="card"><p class="sub" style="margin:0">No hay noticias.</p></div>';
+  return h+'<div class="news">'+NEWS.items.map(a=>{
+    const img=a.images&&a.images[0]&&a.images[0].url, link=a.links&&a.links.web&&a.links.web.href;
+    const teams=(a.categories||[]).filter(c=>c.type==='team'&&c.team).map(c=>c.team.abbreviation).filter(x=>TEAMS[x]);
+    const video=a.type==='Media';
+    return `<a class="card art" href="${esc(link)}" target="_blank" rel="noopener">
+      ${img?`<div class="ai" style="background-image:url('${esc(img)}')">${video?'<span class="vid">▶ Vídeo</span>':''}</div>`:''}
+      <div class="at"><b>${esc(a.headline)}</b>${a.description?`<p>${esc(a.description)}</p>`:''}
+      <div class="am">${[...new Set(teams)].slice(0,4).map(t=>`<img src="${logoUrl(t)}" alt="${t}" title="${tname(t)}">`).join('')}<span>${ago(a.published)}</span></div></div></a>`;
+  }).join('')+'</div>';
+}
+
+const TABS={general:['Marcador',viewGeneral],comp:['Clasificación',viewComp,'Clasif.'],player:['Jugadores',viewPlayer],cal:['Calendario',viewCal],news:['Noticias',viewNews]};
 
 function render(){
-  $('#tabs').innerHTML=Object.entries(TABS).map(([k,v])=>`<button data-t="${k}" class="${k===tab?'on':''}">${v[0]}</button>`).join('');
+  $('#tabs').innerHTML=Object.entries(TABS).map(([k,v])=>`<button data-t="${k}" class="${k===tab?'on':''}">${v[2]?`<span class="lf">${v[0]}</span><span class="ls">${v[2]}</span>`:v[0]}</button>`).join('');
   $('#view').innerHTML=Object.keys(TEAMS).length&&names.length?TABS[tab][1]():'';
 }
 document.addEventListener('click',e=>{
@@ -626,6 +690,7 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',e=>{
   if(e.target.id==='calpick'&&e.target.value){calDay=e.target.value;render();}
+  if(e.target.id==='newsteam'){newsTeam=e.target.value;render();}
 });
 
 // lee un JSON del repo; si no se pueden leer los archivos locales (p. ej. abriendo el html con doble clic, file://), lo lee de GitHub
