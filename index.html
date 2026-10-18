@@ -57,18 +57,19 @@ td.l,th.l{text-align:left}
 .wall i:nth-child(n+4){display:none}
 @media (min-width:700px){.wall i:nth-child(n+4){display:block}.wall i:nth-child(n+6){display:none}}
 body::after{content:"";position:fixed;inset:0;z-index:-1;background:var(--bg);opacity:.88}
-.feast{position:relative;overflow:hidden;border-radius:16px;border:1px solid var(--accent);margin-bottom:16px;color:#fff;background:#000}
+.feast{position:relative;overflow:hidden;border-radius:14px;border:1px solid var(--accent);color:#fff;background:#000}
 .feast .pics{position:absolute;inset:0;display:grid;grid-template-columns:repeat(5,1fr)}
 .feast .pics i{background-size:cover;background-position:center}
 .feast .pics::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.88),rgba(0,0,0,.55))}
-.feast .txt{position:relative;padding:18px 20px}
+.feast .txt{position:relative;padding:14px 16px}
 .feast h3{margin:0 0 4px;font-size:18px;color:#fcd34d}
 .feast p{margin:0;font-size:14px;line-height:1.5}
 .feast b{color:#fcd34d}
-.feast .cd{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:15px;line-height:1.35}
-.feast .big{font-size:46px;font-weight:800;color:#fcd34d;line-height:1;font-variant-numeric:tabular-nums}
-.feast .cd span:last-child{flex:1;min-width:200px}
-.feast .fbar{height:6px;border-radius:6px;background:rgba(255,255,255,.2);margin:12px 0 6px;overflow:hidden}
+.feast .cd{display:flex;align-items:center;gap:14px;font-size:14px;line-height:1.35}
+.feast .big{font-size:38px;font-weight:800;color:#fcd34d;line-height:1;font-variant-numeric:tabular-nums;text-align:center}
+.feast .big small{display:block;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.feast .cd span:last-child{flex:1}
+.feast .fbar{height:5px;border-radius:6px;background:rgba(255,255,255,.2);margin:10px 0 5px;overflow:hidden}
 .feast .fbar i{display:block;height:100%;background:#fcd34d}
 .feast .fsub{font-size:12px;opacity:.85}
 .av{width:36px;height:36px;border-radius:50%;object-fit:cover;object-position:50% 15%;background:var(--card2);flex:none}
@@ -76,6 +77,16 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;background:var(--bg);op
 .who{display:flex;align-items:center;gap:10px}
 th .av{width:30px;height:30px;display:block;margin:0 auto 3px}
 .chart{padding:8px 4px}
+.rk td{padding:6px 8px}
+.rk .who{gap:8px}
+.rk .av{width:28px;height:28px}
+.rk .md{font-size:18px}
+.rk .pt{font-size:20px;font-weight:800}
+.rk .tag{font-size:10px;vertical-align:1px}
+.rk .det{font-size:11px;color:var(--mute)}
+.rk td.l{width:100%}
+.rk tr.eat td{background:rgba(34,197,94,.06)}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
 .chart svg{display:block}
 .chart .gl{stroke:var(--line);stroke-width:1}
 .chart .ax{fill:var(--mute);font-size:11px}
@@ -142,6 +153,7 @@ let ORDER = {E:[],W:[]};
 let PRESEASON = false;
 let REG = { start:'2026-10-20T07:00:00Z', end:'2027-04-12T06:59:00Z' };
 const GAMES = 82;
+const BET_START = '2026-10-18';   // primer día del historial: el eje X del gráfico va de aquí a hoy
 let tab = 'general', selPlayer = null;
 let names = [];
 
@@ -229,26 +241,22 @@ function feast(sc){
   const fin=new Date(end).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'});
   const who=`<b>${pa}</b> inviten a <b>${gu}</b>`;
   return `<div class="feast"><div class="pics">${pics}</div><div class="txt">
-    <h3>🍷 La apuesta en juego</h3>
-    <div class="cd"><span class="big">${days}</span><span>${days===1?'día':'días'} para que ${who} a una cena <b>gourmet</b> de las buenas</span></div>
+    <div class="cd"><span class="big">${days}<small>${days===1?'día':'días'}</small></span><span>para que ${who} a una cena <b>gourmet</b> de las buenas 🍷</span></div>
     <div class="fbar"><i style="width:${pct}%"></i></div>
-    <p class="fsub">Jornada <b>${gp}</b> de ${GAMES} · la liga regular acaba el ${fin}</p>
+    <p class="fsub">Jornada <b>${gp}</b> de ${GAMES} · fin de la liga regular: ${fin}</p>
   </div></div>`;
 }
 
 function viewGeneral(){
-  const sc=score(), max=Math.max(...sc.map(s=>s.total),1);
+  const sc=score();
   const medals=['🥇','🥈','🥉','4º'];
-  let h=feast(sc)+'<div class="cards">'+sc.map((s,i)=>`
-    <div class="card ${i===0?'first':''}">
-      <div class="rank">${medals[i]||i+1+'º'}</div>
-      <div class="who">${person(s.name,'big')}<div class="name">${s.name}</div></div>
-      <div class="total">${s.total}</div>
-      <div class="split"><span>Posiciones: <b>${s.base}</b></span><span>Bonus: <b>${s.bonus}</b></span>
-      ${i>0?`<span>A ${s.total-sc[0].total} del 1º</span>`:'<span>Líder</span>'}</div>
-      <div class="bar"><i style="width:${Math.max(4,100*s.total/max)}%"></i></div>
-    </div>`).join('')+'</div>';
-  h+='<h2>Evolución</h2>'+chart();
+  let h='<h2 style="margin-top:4px">Evolución</h2>'+chart();
+  h+='<h2>Clasificación</h2><div class="tablebox"><table class="rk"><tr><th>#</th><th class="l">Jugador</th><th>Puntos</th><th>Dif.</th></tr>'
+    +sc.map((s,i)=>`<tr class="${i<2?'eat':'pay'}"><td class="md">${medals[i]||i+1+'º'}</td>
+      <td class="l"><div class="who"><i class="dot" style="background:${COLORS[s.name]}"></i>${person(s.name)}<div><b>${s.name}</b> <span class="tag ${i<2?'win':'no'}">${i<2?'come':'paga'}</span><div class="det">posiciones ${s.base} · bonus ${s.bonus}</div></div></div></td>
+      <td class="pt">${s.total}</td><td>${i?'+'+(s.total-sc[0].total):'—'}</td></tr>`).join('')
+    +'</table></div>';
+  h+='<h2>La apuesta</h2>'+feast(sc);
   h+='<h2>Resumen bonus</h2>'+betsTable();
   return h;
 }
@@ -260,25 +268,29 @@ function chart(){
   const today=dayIn(TZ), live={d:today,pts:Object.fromEntries(score().map(s=>[s.name,s.total]))};
   const i=days.findIndex(x=>x.d===today); if(i>=0) days[i]=live; else days.push(live);
   days.sort((a,b)=>a.d.localeCompare(b.d));
+  for(let k=days.length-1;k>=0;k--) if(days[k].d<BET_START||days[k].d>today) days.splice(k,1);
 
-  const W=Math.max(340,Math.min(1068,(window.innerWidth||800)-34)), H=320, L=38, R=150, T=24, B=30;
-  const first=days[0].d, idx=d=>Math.round((new Date(d)-new Date(first))/864e5);
-  const span=Math.max(6,idx(days[days.length-1].d));
+  const W=Math.max(340,Math.min(1068,(window.innerWidth||800)-34)), H=320, L=38, R=120, T=24, B=30;
+  const first=BET_START, idx=d=>Math.round((new Date(d)-new Date(first))/864e5);
+  const span=idx(today);
   const vals=days.flatMap(x=>names.map(n=>x.pts[n]).filter(v=>v!=null));
   let lo=Math.min(...vals), hi=Math.max(...vals);
   if(hi-lo<10){const m=(hi+lo)/2; lo=m-5; hi=m+5;}
   const pad=(hi-lo)*.08; lo-=pad; hi+=pad;
-  const X=d=>L+idx(d)/span*(W-L-R), Y=v=>T+(v-lo)/(hi-lo)*(H-T-B);   // menos puntos = más arriba
+  const X=d=>L+(span?idx(d)/span:0)*(W-L-R), Y=v=>T+(v-lo)/(hi-lo)*(H-T-B);   // menos puntos = más arriba
 
   let g='';
   for(let k=0;k<=4;k++){
     const v=lo+(hi-lo)*k/4, y=Y(v);
     g+=`<line x1="${L}" x2="${W-R+10}" y1="${y}" y2="${y}" class="gl"/><text x="${L-6}" y="${y+4}" text-anchor="end" class="ax">${Math.round(v)}</text>`;
   }
-  const step=Math.ceil(span/Math.max(2,Math.floor((W-L-R)/70)));
-  for(let k=0;k<=span;k+=step){
+  const step=Math.max(1,Math.ceil(span/Math.max(2,Math.floor((W-L-R)/70))));
+  const ticks=[];
+  for(let k=0;k<=span;k+=step) if(!(k&&span-k<step*.6)) ticks.push(k);   // que no se pisen con la última
+  if(ticks[ticks.length-1]!==span) ticks.push(span);                     // hoy siempre aparece
+  for(const k of ticks){
     const d=addDays(first,k);
-    g+=`<text x="${X(d)}" y="${H-8}" text-anchor="middle" class="ax">${new Date(d+'T12:00:00Z').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</text>`;
+    g+=`<text x="${X(d)}" y="${H-8}" text-anchor="${k===0&&span?'start':'middle'}" class="ax">${new Date(d+'T12:00:00Z').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</text>`;
   }
   const ends=[];
   for(const n of names){
