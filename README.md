@@ -112,6 +112,41 @@ node scripts/update.mjs       # actualizar los datos a mano (necesita Node 18+)
 - El orden de equipos usa `playoffSeed` de ESPN, con desempate por porcentaje de victorias y diferencia de puntos.
 - Se quitó el pie de créditos de las fotos a petición del usuario. Las fotos de Wikimedia con licencia CC BY piden atribución si la web se difunde de forma abierta.
 
+## Idea pendiente: estadísticas de cada partido (probado el 18/10/2026, NO implementado)
+
+**Objetivo:** en el Calendario, al tocar un partido, ver la estadística de cada jugador. Las columnas serían minutos, puntos, rebotes, asistencias, robos, tiros (metidos/intentados), triples (metidos/intentados), % de tiro, % de triples, pérdidas y +/-.
+
+### Lo que se probó
+
+- **Endpoint:** `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=<id>`. El `<id>` es el `id` de cada partido en `data/calendario.json`.
+- **Se puede pedir desde el navegador:** responde con `access-control-allow-origin: *` y `cache-control: max-age=8`. No hace falta guardarlo en el repo, la web lo puede pedir al tocar el partido.
+- **Tamaño:** unos 40 KB por partido. Se pide solo al abrir uno.
+- **Probado con un partido jugado** (pretemporada, Jazz en Suns, 16/10/2026, id `401908948`). Funciona y trae todo lo pedido:
+  - `boxscore.players`: un elemento por equipo (`team.abbreviation`).
+  - `boxscore.players[i].statistics[0].labels`: `MIN, PTS, FG, 3PT, FT, REB, AST, TO, STL, BLK, OREB, DREB, PF, +/-`.
+  - `...statistics[0].athletes[]`: un elemento por jugador:
+    - `athlete.displayName`, `athlete.jersey`, `athlete.position.abbreviation` y `athlete.headshot.href` (foto).
+    - `starter` (titular sí o no) y `didNotPlay`.
+    - `stats`: array de textos en el mismo orden que `labels`. Ejemplo: `["27","19","5-12","3-7","6-6","5","1","0","1","0","1","4","1","0"]`.
+  - `...statistics[0].totals`: los totales del equipo, en el mismo orden.
+  - **FG y 3PT** vienen como `"metidos-intentados"` (`"5-12"`). **El % por jugador no viene**: hay que calcularlo (5/12 = 41,7 %). El % del equipo sí viene, en `boxscore.teams[i].statistics` ("Field Goal %", "Three Point %").
+  - **+/-** viene como texto: `"+10"`, `"0"`, `"-4"`.
+- **Jugadores que no jugaron:** tienen `didNotPlay: true` y `stats: []`. Ojo: el campo `reason` ("COACH'S DECISION") aparece también en jugadores que **sí** jugaron. Para saber si alguien jugó hay que usar `didNotPlay` o `stats` vacío, nunca `reason`.
+- **Probado con un partido sin jugar** (Celtics-Pistons, 20/10/2026, id `401909088`): `boxscore.players` viene **vacío** y el estado es `pre`. La web debería mostrar algo como "Las estadísticas aparecen cuando empiece el partido".
+
+### Lo que NO se pudo probar
+
+- **Partidos en directo:** no había ninguno en juego. Es de esperar que `summary` vaya actualizando la estadística durante el partido (por eso el caché es de 8 s), pero hay que comprobarlo el **20/10/2026** con el primer partido de liga regular. Si funciona, la ficha del partido abierto se puede refrescar cada 30-60 s.
+- **Liga regular:** solo se probó con pretemporada. Se espera el mismo formato, a confirmar el 20/10.
+
+### Cómo se haría (plan)
+
+1. **Calendario:** cada tarjeta de partido se puede tocar si su `st` es `in` o `post`.
+2. **Al tocarla:** se abre un panel con dos tablas, una por equipo, con los titulares primero y luego el banquillo.
+3. **Columnas:** MIN, PTS, REB, AST, STL, TO, FG, FG%, 3PT, 3P% y +/-. Los que no jugaron van al final en gris, con "No jugó".
+4. **Totales:** la fila de totales del equipo, con el % de tiro de `boxscore.teams`.
+5. **Móvil:** la tabla será ancha, así que la columna del nombre irá fija a la izquierda y el resto se deslizará de lado.
+
 ## Pendiente
 
 - [ ] El **20/10/2026**, con los primeros partidos de liga regular, comprobar que la web pasa a datos reales y se refresca sola.
