@@ -124,6 +124,28 @@ node scripts/update.mjs       # actualizar los datos a mano (necesita Node 18+)
 - **Sin filtro por jugador:** la API lo ignora. Lo probamos con `athlete`, `athletes`, `athleteId` y `player`, y `athletes/<id>/news` da error.
 - **En español:** existe con `&lang=es&region=us` (ESPN Deportes), pero se eligió inglés porque hay más noticias y llegan antes.
 
+## Páginas de equipo y de jugador
+
+En **cualquier pestaña**:
+- Tocar un **escudo** abre la página del equipo.
+- Tocar la **foto o el nombre de un jugador NBA** abre su ficha. Esto funciona en líderes, lesiones, apuestas de premios, plantillas y estadística de partido.
+- Tocar la **cara de uno de los 4** lleva a su pestaña en *Jugadores*.
+- **"← Volver"** regresa a la página anterior, y tocar una pestaña cierra la página.
+
+**Página de equipo:**
+- **KPIs** (de la clasificación de ESPN, `avgPointsFor` / `avgPointsAgainst`): puntos por partido y en contra, con su puesto entre los 30, récord, % de victorias, racha y últimos 10. En pretemporada lleva la etiqueta "pretemporada".
+- **La apuesta:** dónde puso cada uno al equipo y cuántos puntos le suma.
+- **Partidos:** los últimos 5 y los próximos 5, sacados de `data/calendario.json`. Al tocar uno se abre su ficha en Calendario.
+- **Plantilla** con medias, lesiones y noticias del equipo (`news?team=<id>&limit=12`).
+
+**Ficha de jugador:** se pide a ESPN al abrirla y se guarda 10 minutos en memoria.
+- **Datos personales**, de `site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/<id>`: dorsal, equipo, posición en español, altura y peso en cm/kg, edad, lugar de nacimiento, draft y temporada.
+- **Del mismo endpoint con `/overview`:**
+  - Medias de temporada, playoffs y carrera.
+  - Últimos 5 partidos (`gameLog`).
+  - Noticias del jugador: aquí sí las hay, unas 13.
+- **Además:** lesión actual, si la tiene, y quién lo apostó en premios.
+
 ## Líderes
 
 - **Origen:** la pestaña Líderes muestra el top 10 de jugadores y de equipos en puntos totales, puntos, asistencias, rebotes, eficiencia y robos por partido.

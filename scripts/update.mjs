@@ -234,7 +234,7 @@ async function backups() {
         statistics: [{
           labels: st.labels, totals: st.totals,
           athletes: st.athletes.map(a => ({
-            athlete: { displayName: a.athlete.displayName, shortName: a.athlete.shortName, jersey: a.athlete.jersey },
+            athlete: { id: a.athlete.id, displayName: a.athlete.displayName, shortName: a.athlete.shortName, jersey: a.athlete.jersey },
             starter: !!a.starter, didNotPlay: !!a.didNotPlay, stats: a.stats || [],
           })),
         }],
