@@ -122,6 +122,20 @@ node scripts/update.mjs       # actualizar los datos a mano (necesita Node 18+)
 - **Sin filtro por jugador:** la API lo ignora. Lo probamos con `athlete`, `athletes`, `athleteId` y `player`, y `athletes/<id>/news` da error.
 - **En español:** existe con `&lang=es&region=us` (ESPN Deportes), pero se eligió inglés porque hay más noticias y llegan antes.
 
+## Lesiones
+
+- **Origen:** parte de lesiones de toda la liga de ESPN, pedido desde el navegador y guardado 10 minutos en memoria. No ocupa espacio en el repo.
+  - Endpoint: `site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries`, unos 50 KB.
+  - Trae estado (Out / Day-To-Day), lesión (`details.type` y `side`), fecha prevista de vuelta (`details.returnDate`) y comentarios en inglés.
+  - El id del jugador no viene suelto: se saca de su enlace (`/id/<n>/`).
+- **Orden:** siempre de más a menos importante, según los puntos por partido de `data/plantillas.json`. Los que no tienen datos van al final.
+- **Dónde se ve:**
+  1. **Noticias → 🩹 Lesiones:** el parte completo, con el mismo filtro de equipo que las noticias, o todos. Al tocar un jugador se abre el comentario.
+  2. **Ficha de cada partido no terminado:** "Lesionados" de cada equipo. En la plantilla, la etiqueta baja/duda también sale del parte en directo.
+  3. **Marcador → Resumen bonus:** aviso "Lesionados entre vuestras apuestas" con quién apostó a cada uno. Además, en la cuadrícula de fotos, una cruz roja marca una baja y una naranja una duda.
+- **Ids de los jugadores apostados:** están en `PICK_ESPN`, en `index.html`. Si cambia algún premio apostado, hay que añadir su id ahí.
+- **Traducción:** las zonas del cuerpo se traducen con `BODY_ES`. Si sale alguna en inglés, hay que añadirla ahí.
+
 ## Ficha de cada partido (Calendario)
 
 Al tocar un partido se abre su ficha, con "← Volver a la jornada" para salir.
