@@ -23,6 +23,7 @@ h2{font-size:16px;margin:28px 0 10px;color:var(--mute);text-transform:uppercase;
 .status.err{color:var(--warn)}
 nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
 nav button,.pill{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font:inherit;cursor:pointer}
+@media (max-width:480px){nav{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}nav button{padding:8px 2px;font-size:12.5px;white-space:nowrap}}
 nav button.on,.pill.on{background:var(--accent);color:#111;border-color:var(--accent);font-weight:600}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
@@ -77,6 +78,20 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;background:var(--bg);op
 .who{display:flex;align-items:center;gap:10px}
 th .av{width:30px;height:30px;display:block;margin:0 auto 3px}
 .chart{padding:8px 4px}
+.bg th{font-size:11px;padding:6px 2px;line-height:1.2}
+.bg th small{display:block;font-weight:500;opacity:.8}
+.bg td{padding:5px 2px}
+.bg .bn{width:56px;padding-left:8px}
+.bg .bn .av{width:30px;height:30px;display:block;margin:0 auto}
+.bg .bn small{display:block;font-size:10px;color:var(--mute);margin-top:2px}
+.bg tr.res td{background:var(--card2)}
+.bi{width:40px;height:40px;border-radius:50%;padding:0;border:3px solid var(--line);background:var(--card2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;font:700 16px system-ui;color:var(--mute)}
+.bi .av{width:100%;height:100%;border-radius:0}
+.bi .lg{width:72%;height:72%;object-fit:contain}
+.bi.win{border-color:var(--good)}
+.bi.fin{border-color:var(--accent)}
+.bi.no{opacity:.4;filter:grayscale(1)}
+.bi.sel{outline:2px solid var(--text);outline-offset:2px}
 .rk td{padding:6px 8px}
 .rk .who{gap:8px}
 .rk .av{width:28px;height:28px}
@@ -136,12 +151,12 @@ const NAMES = {
 
 // Puntos de los bonus; deben coincidir con BETS de scripts/update.mjs
 const BETS = [
-  { key:'cup',   label:'Copa',            win:-6, fin:-2, team:true },
-  { key:'mvp',   label:'MVP',             win:-3, fin:-1 },
-  { key:'dpoy',  label:'DPOY',            win:-3, fin:-1 },
-  { key:'mip',   label:'MIP',             win:-6, fin:-2 },
-  { key:'sixth', label:'6º hombre',       win:-6, fin:-2 },
-  { key:'coach', label:'Entrenador',      win:-6, fin:-2 },
+  { key:'cup',   label:'Copa',            short:'Copa',  win:-6, fin:-2, team:true },
+  { key:'mvp',   label:'MVP',             short:'MVP',   win:-3, fin:-1 },
+  { key:'dpoy',  label:'DPOY',            short:'DPOY',  win:-3, fin:-1 },
+  { key:'mip',   label:'MIP',             short:'MIP',   win:-6, fin:-2 },
+  { key:'sixth', label:'6º hombre',       short:'6º',    win:-6, fin:-2 },
+  { key:'coach', label:'Entrenador',      short:'Entr.', win:-6, fin:-2 },
 ];
 
 const API = 'https://site.api.espn.com/apis/v2/sports/basketball/nba/standings';
@@ -351,14 +366,15 @@ function viewCal(){
   games.sort((a,b)=>a.d.localeCompare(b.d));
   liveDay(calDay);
   const first=dayIn(US,new Date(CAL.games[0].d)), last=dayIn(US,new Date(CAL.games[CAL.games.length-1].d));
-  const title=new Date(calDay+'T12:00:00Z').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
+  const t0=new Date(calDay+'T12:00:00Z').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
+  const title=t0.charAt(0).toUpperCase()+t0.slice(1);
   let h=`<div class="calbar">
     <button class="pill" data-cal="-1" aria-label="Día anterior">◀</button>
     <input type="date" id="calpick" value="${calDay}" min="${first}" max="${last}">
     <button class="pill" data-cal="1" aria-label="Día siguiente">▶</button>
     <button class="pill" data-cal="0">Hoy</button>
   </div>
-  <p class="sub" style="text-transform:capitalize">${title}</p>
+  <p class="sub">${title}</p>
   <p class="sub">Jornada de EE. UU.; las horas están en hora española.</p>`;
   if(!games.length) return h+'<div class="card"><p class="sub" style="margin:0">No hay partidos este día.</p></div>';
   h+='<div class="games">'+games.map(g=>{
@@ -373,20 +389,24 @@ function viewCal(){
   return h;
 }
 
+// cuadrícula de fotos: una fila por amigo, una columna por apuesta; al tocar una foto se ve el nombre
 function betsTable(){
-  let h='<div class="tablebox"><table><tr><th class="l">Apuesta</th>'+names.map(n=>`<th>${person(n)}${n}</th>`).join('')+'<th>Resultado</th></tr>';
-  for(const b of BETS){
-    const r=RESULTS[b.key];
-    h+=`<tr><td class="l"><b>${b.label}</b><br><small class="sub">${b.win} / ${b.fin}</small></td>`;
-    for(const n of names){
-      const bp=betPoints(n,b);
-      const tag = bp.state==='win'?`<span class="tag win">${bp.pts}</span>`:bp.state==='fin'?`<span class="tag fin">${bp.pts}</span>`:bp.state==='no'?`<span class="tag no">0</span>`:'';
-      h+=`<td><div class="team" style="justify-content:center">${pickImg(b,PLAYERS[n][b.key])}<span>${pickName(b,PLAYERS[n][b.key])}</span></div>${tag}</td>`;
-    }
-    const fin=(r.finalists||[]).map(x=>pickName(b,x)).join(', ');
-    h+=`<td>${r.winner?`<div class="team" style="justify-content:center">${pickImg(b,r.winner)}<b>${pickName(b,r.winner)}</b></div><br><small class="sub">${fin}</small>`:'<span class="tag">pendiente</span>'}</td></tr>`;
+  const ico=(b,id,st,info)=>`<button class="bi ${st}" data-info="${info}">${b.team?`<img src="${logoUrl(id)}" alt="" class="lg">`:pickImg(b,id)}</button>`;
+  let h='<div class="tablebox"><table class="bg"><tr><th></th>'+BETS.map(b=>`<th>${b.short}<small>${b.win}/${b.fin}</small></th>`).join('')+'</tr>';
+  for(const n of names){
+    h+=`<tr><td class="bn">${person(n)}<small>${n}</small></td>`+BETS.map(b=>{
+      const id=PLAYERS[n][b.key], st=betPoints(n,b).state;
+      const res={win:` · acertada (${b.win})`,fin:` · finalista (${b.fin})`,no:' · fallada',pending:''}[st];
+      return `<td>${ico(b,id,st,`${n} · ${b.label}: ${pickName(b,id)}${res}`)}</td>`;
+    }).join('')+'</tr>';
   }
-  return h+'</table></div>';
+  h+='<tr class="res"><td class="bn"><b>🏆</b><small>Resultado</small></td>'+BETS.map(b=>{
+    const r=RESULTS[b.key];
+    if(!r.winner) return `<td><button class="bi pend" data-info="${b.label}: pendiente">?</button></td>`;
+    const fin=(r.finalists||[]).filter(x=>x!==r.winner).map(x=>pickName(b,x)).join(', ');
+    return `<td>${ico(b,r.winner,'win',`${b.label}: ganó ${pickName(b,r.winner)}${fin?' · finalistas: '+fin:''}`)}</td>`;
+  }).join('')+'</tr></table></div>';
+  return h+`<p class="sub" id="binfo" style="margin-top:8px">Toca una foto para ver el nombre. Verde: acertada · naranja: finalista · gris: fallada.</p>`;
 }
 
 function viewConf(c, title){
@@ -432,7 +452,7 @@ function viewPlayer(){
   return h+'</table></div>';
 }
 
-const TABS={general:['Marcador',viewGeneral],comp:['Comparativa y clasificación',viewComp],player:['Por jugador',viewPlayer],cal:['Calendario',viewCal]};
+const TABS={general:['Marcador',viewGeneral],comp:['Clasificación',viewComp],player:['Jugadores',viewPlayer],cal:['Calendario',viewCal]};
 
 function render(){
   $('#tabs').innerHTML=Object.entries(TABS).map(([k,v])=>`<button data-t="${k}" class="${k===tab?'on':''}">${v[0]}</button>`).join('');
@@ -443,6 +463,11 @@ document.addEventListener('click',e=>{
   if(t){tab=t.dataset.t;render();}
   else if(p){selPlayer=p.dataset.p;render();}
   else if(c){const n=+c.dataset.cal; calDay=n?addDays(calDay,n):dayIn(US); render();}
+});
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-info]'); if(!b) return;
+  document.querySelectorAll('.bi.sel').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+  const i=document.getElementById('binfo'); if(i) i.textContent=b.dataset.info;
 });
 document.addEventListener('change',e=>{
   if(e.target.id==='calpick'&&e.target.value){calDay=e.target.value;render();}
