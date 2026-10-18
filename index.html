@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apuesta NBA 26/27</title>
+<style>
+:root{
+  --bg:#0f1117;--card:#181b24;--card2:#1f2330;--line:#2a2f3e;--text:#e8eaf0;--mute:#8b91a3;
+  --accent:#f59e0b;--good:#22c55e;--bad:#ef4444;--warn:#f97316;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme:light){
+  :root{--bg:#f4f5f8;--card:#fff;--card2:#eef0f5;--line:#dfe2ea;--text:#171a22;--mute:#667085;color-scheme:light}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:0 16px}
+.wrap{max-width:1100px;margin:0 auto;padding-block:20px 60px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:16px}
+h1{font-size:22px;margin:0}
+h2{font-size:16px;margin:28px 0 10px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.status{font-size:12px;color:var(--mute)}
+.status.err{color:var(--warn)}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+nav button,.pill{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font:inherit;cursor:pointer}
+nav button.on,.pill.on{background:var(--accent);color:#111;border-color:var(--accent);font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.card.first{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.rank{font-size:13px;color:var(--mute)}
+.name{font-size:18px;font-weight:700;margin:2px 0}
+.total{font-size:40px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.split{display:flex;gap:14px;font-size:12px;color:var(--mute);margin-top:6px;flex-wrap:wrap}
+.bar{height:8px;border-radius:6px;background:var(--card2);margin-top:12px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent)}
+.tablebox{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:7px 10px;text-align:center;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{font-size:12px;color:var(--mute);font-weight:600;background:var(--card2)}
+tr:last-child td{border-bottom:0}
+td.l,th.l{text-align:left}
+.team{display:flex;align-items:center;gap:8px}
+.team img{width:24px;height:24px;object-fit:contain}
+.cell{display:inline-flex;flex-direction:column;align-items:center;min-width:44px;border-radius:8px;padding:2px 6px;line-height:1.15}
+.cell b{font-size:14px}.cell small{font-size:11px;opacity:.85}
+.W{color:var(--good)}.L{color:var(--bad)}
+.sub{color:var(--mute);font-size:13px;margin:-4px 0 10px}
+.bets{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.bets h3{margin:0 0 8px;font-size:15px}
+.bets table td,.bets table th{padding:5px 8px}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--card2);color:var(--mute)}
+.tag.win{background:var(--good);color:#06240f}.tag.fin{background:var(--accent);color:#111}
+.tag.no{background:var(--card2);color:var(--bad)}
+.hide{display:none}
+.wall{position:fixed;inset:0;z-index:-2;display:flex;background:var(--bg)}
+.wall i{flex:1;background-size:cover;background-position:center 30%}
+.wall i:nth-child(n+4){display:none}
+@media (min-width:700px){.wall i:nth-child(n+4){display:block}.wall i:nth-child(n+6){display:none}}
+body::after{content:"";position:fixed;inset:0;z-index:-1;background:var(--bg);opacity:.88}
+.feast{position:relative;overflow:hidden;border-radius:16px;border:1px solid var(--accent);margin-bottom:16px;color:#fff;background:#000}
+.feast .pics{position:absolute;inset:0;display:grid;grid-template-columns:repeat(5,1fr)}
+.feast .pics i{background-size:cover;background-position:center}
+.feast .pics::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.88),rgba(0,0,0,.55))}
+.feast .txt{position:relative;padding:18px 20px}
+.feast h3{margin:0 0 4px;font-size:18px;color:#fcd34d}
+.feast p{margin:0;font-size:14px;line-height:1.5}
+.feast b{color:#fcd34d}
+.feast .cd{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:15px;line-height:1.35}
+.feast .big{font-size:46px;font-weight:800;color:#fcd34d;line-height:1;font-variant-numeric:tabular-nums}
+.feast .cd span:last-child{flex:1;min-width:200px}
+.feast .fbar{height:6px;border-radius:6px;background:rgba(255,255,255,.2);margin:12px 0 6px;overflow:hidden}
+.feast .fbar i{display:block;height:100%;background:#fcd34d}
+.feast .fsub{font-size:12px;opacity:.85}
+.av{width:36px;height:36px;border-radius:50%;object-fit:cover;object-position:50% 15%;background:var(--card2);flex:none}
+.av.big{width:56px;height:56px}
+.who{display:flex;align-items:center;gap:10px}
+th .av{width:30px;height:30px;display:block;margin:0 auto 3px}
+</style>
+</head>
+<body>
+<div class="wall"><i style="background-image:url(img/bg/wemby2.jpg)"></i><i style="background-image:url(img/bg/jokic.jpg)"></i><i style="background-image:url(img/bg/doncic.jpg)"></i><i style="background-image:url(img/bg/lebron2.jpg)"></i><i style="background-image:url(img/bg/giannis.jpg)"></i></div>
+<div class="wrap">
+<header>
+  <h1>🏀 Apuesta NBA 2026/27</h1>
+  <div id="status" class="status">Cargando…</div>
+</header>
+<nav id="tabs"></nav>
+<main id="view"></main>
+<p class="sub" style="margin-top:30px">Gana quien tenga menos puntos. Puntos = suma de la diferencia entre tu posición apostada y la real en cada conferencia, menos los bonus de copa y premios.</p>
+</div>
+
+<script>
+/* ============================================================
+   DATOS DE LA APUESTA (fijos)
+   Equipos por abreviatura de ESPN. Orden = posición apostada (1..15)
+   ============================================================ */
+const PLAYERS = {
+  Ghali:  { E:['NY','PHI','BOS','DET','MIA','IND','TOR','CLE','ATL','ORL','WSH','CHI','BKN','CHA','MIL'],
+            W:['SA','OKC','MIN','LAL','DEN','DAL','GS','PHX','POR','HOU','LAC','MEM','SAC','UTAH','NO'],
+            cup:'MIA', mvp:'doncic', dpoy:'duren', mip:'mamukelashvili', sixth:'sexton', coach:'spoelstra' },
+  Telmo:  { E:['CLE','NY','PHI','IND','MIA','BOS','TOR','ATL','WSH','CHA','DET','ORL','CHI','BKN','MIL'],
+            W:['OKC','LAL','SA','MIN','DEN','UTAH','DAL','HOU','PHX','GS','POR','LAC','MEM','NO','SAC'],
+            cup:'LAL', mvp:'doncic', dpoy:'wembanyama', mip:'harper', sixth:'hezonja', coach:'redick' },
+  Manu:   { E:['CLE','NY','BOS','PHI','MIA','IND','DET','ATL','ORL','TOR','CHA','CHI','WSH','BKN','MIL'],
+            W:['SA','OKC','DEN','LAL','MIN','HOU','GS','DAL','PHX','UTAH','POR','LAC','SAC','NO','MEM'],
+            cup:'SA', mvp:'jokic', dpoy:'wembanyama', mip:'buzelis', sixth:'dosunmu', coach:'mazzulla' },
+  Adrian: { E:['NY','CLE','DET','PHI','MIA','BOS','TOR','CHA','IND','ORL','ATL','WSH','CHI','BKN','MIL'],
+            W:['OKC','SA','MIN','DEN','LAL','DAL','HOU','GS','PHX','POR','UTAH','LAC','MEM','SAC','NO'],
+            cup:'LAL', mvp:'wembanyama', dpoy:'wembanyama', mip:'queta', sixth:'portis', coach:'mjohnson' },
+};
+
+const NAMES = {
+  doncic:'Luka Dončić', duren:'Jalen Duren', mamukelashvili:'Sandro Mamukelashvili', sexton:'Collin Sexton',
+  spoelstra:'Erik Spoelstra', wembanyama:'Victor Wembanyama', harper:'Dylan Harper', hezonja:'Mario Hezonja',
+  redick:'JJ Redick', jokic:'Nikola Jokić', buzelis:'Matas Buzelis', dosunmu:'Ayo Dosunmu',
+  mazzulla:'Joe Mazzulla', queta:'Neemias Queta', portis:'Bobby Portis', mjohnson:'Mitch Johnson',
+};
+
+/* ============================================================
+   RESULTADOS DE COPA Y PREMIOS (se rellenan a mano cuando se sepan)
+   winner: id del ganador (o abreviatura de equipo en la copa)
+   finalists: ids de los finalistas (MVP/DPOY: los 3 finalistas; copa: los 2 equipos de la final)
+   Dejar winner:null mientras no se sepa.
+   ============================================================ */
+const RESULTS = {
+  cup:   { winner:null, finalists:[] },
+  mvp:   { winner:null, finalists:[] },
+  dpoy:  { winner:null, finalists:[] },
+  mip:   { winner:null, finalists:[] },
+  sixth: { winner:null, finalists:[] },
+  coach: { winner:null, finalists:[] },
+};
+
+const BETS = [
+  { key:'cup',   label:'Copa',            win:-6, fin:-2, team:true },
+  { key:'mvp',   label:'MVP',             win:-3, fin:-1 },
+  { key:'dpoy',  label:'DPOY',            win:-3, fin:-1 },
+  { key:'mip',   label:'MIP',             win:-6, fin:-2 },
+  { key:'sixth', label:'6º hombre',       win:-6, fin:-2 },
+  { key:'coach', label:'Entrenador',      win:-6, fin:-2 },
+];
+
+const API = 'https://site.api.espn.com/apis/v2/sports/basketball/nba/standings';
+const REFRESH_MS = 120000;
+
+/* ============================================================ */
+let TEAMS = {};        // abbr -> {abbr,name,logo,conf,pos,w,l,gp,streak,l10}
+let ORDER = {E:[],W:[]};
+let PRESEASON = false;
+let REG = { start:'2026-10-20T07:00:00Z', end:'2027-04-12T06:59:00Z' };
+const GAMES = 82;
+let tab = 'general', selPlayer = Object.keys(PLAYERS)[0];
+
+const $ = s => document.querySelector(s);
+const names = Object.keys(PLAYERS);
+
+function parse(data){
+  const teams = {}, order = {E:[],W:[]};
+  for (const ch of data.children){
+    const conf = /east/i.test(ch.name) ? 'E' : 'W';
+    const list = ch.standings.entries.map(e=>{
+      const s = {}; e.stats.forEach(x=>s[x.name]=x.displayValue);
+      const w = +s.wins||0, l = +s.losses||0;
+      return { abbr:e.team.abbreviation, name:e.team.displayName,
+        logo:(e.team.logos&&e.team.logos[0]&&e.team.logos[0].href)||'', conf,
+        seed:+s.playoffSeed||99, w, l, gp:w+l, pct:+s.winPercent||0, diff:+s.pointDifferential||0,
+        streak:s.streak||'-', l10:s['Last Ten Games']||'-' };
+    });
+    list.sort((a,b)=>a.seed-b.seed || b.pct-a.pct || b.diff-a.diff);
+    list.forEach((t,i)=>{ t.pos=i+1; teams[t.abbr]=t; });
+    if(isPre(data)) list.sort((a,b)=>a.name.localeCompare(b.name));
+    order[conf]=list;
+  }
+  return {teams,order};
+}
+
+function isPre(data){
+  const t=data.seasons&&data.seasons[0]&&data.seasons[0].types||[];
+  const now=Date.now(), reg=t.find(x=>x.abbreviation==='reg');
+  if(reg) REG={start:reg.startDate,end:reg.endDate};
+  return reg ? now < new Date(reg.startDate).getTime() : false;
+}
+
+function betPoints(p, b){
+  const pick = PLAYERS[p][b.key], r = RESULTS[b.key];
+  if (!r.winner) return {pts:0, state:'pending'};
+  if (pick===r.winner) return {pts:b.win, state:'win'};
+  if ((r.finalists||[]).includes(pick)) return {pts:b.fin, state:'fin'};
+  return {pts:0, state:'no'};
+}
+
+function score(force){
+  return names.map(n=>{
+    let base=0; const rows=[];
+    for (const c of ['E','W']){
+      PLAYERS[n][c].forEach((abbr,i)=>{
+        const t=TEAMS[abbr]; const d=t&&(force||!PRESEASON)?Math.abs(t.pos-(i+1)):0;
+        base+=d; rows.push({conf:c,abbr,bet:i+1,real:t?t.pos:null,d});
+      });
+    }
+    let bonus=0; BETS.forEach(b=>bonus+=betPoints(n,b).pts);
+    return {name:n,base,bonus,total:base+bonus,rows};
+  }).sort((a,b)=>a.total-b.total || a.base-b.base);
+}
+
+const tname = a => TEAMS[a]?TEAMS[a].name:a;
+const logo = a => TEAMS[a]&&TEAMS[a].logo?`<img src="${TEAMS[a].logo}" alt="" loading="lazy">`:'';
+const JPG = {redick:1,spoelstra:1,mazzulla:1};
+const person = (n,cls='') => `<img class="av ${cls}" src="img/people/${n}.jpg" alt="${n}">`;
+const pickImg = (b,id) => b.team ? logo(id) : `<img class="av" src="img/awards/${id}.${JPG[id]?'jpg':'png'}" alt="" loading="lazy" onerror="this.style.display='none'">`;
+const pickName = (b,id) => b.team ? tname(id) : (NAMES[id]||id);
+const sign = n => n>0?'+'+n:String(n);
+
+function dcolor(d){
+  if(d===0) return 'background:rgba(34,197,94,.25)';
+  if(d<=2)  return 'background:rgba(34,197,94,.10)';
+  if(d<=4)  return 'background:rgba(245,158,11,.14)';
+  if(d<=6)  return 'background:rgba(249,115,22,.20)';
+  return 'background:rgba(239,68,68,.25)';
+}
+
+/* ---------- vistas ---------- */
+function feast(sc){
+  const pics=['f02','f03','f04','f05','f08'].map(f=>`<i style="background-image:url(img/food/${f}.jpg)"></i>`).join('');
+  const sc2=score(true);
+  const gu=sc2.slice(0,2).map(x=>x.name).join(' y '), pa=sc2.slice(2).map(x=>x.name).join(' y ');
+  const end=new Date(REG.end).getTime(), start=new Date(REG.start).getTime(), now=Date.now();
+  const days=Math.max(0,Math.ceil((end-now)/864e5));
+  const gp=PRESEASON?0:Math.max(0,...Object.values(TEAMS).map(t=>t.gp));
+  const pct=Math.min(100,Math.max(0,100*(now-start)/(end-start)));
+  const fin=new Date(end).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'});
+  const who=`<b>${pa}</b> inviten a <b>${gu}</b>`;
+  return `<div class="feast"><div class="pics">${pics}</div><div class="txt">
+    <h3>🍷 La apuesta en juego</h3>
+    <div class="cd"><span class="big">${days}</span><span>${days===1?'día':'días'} para que ${who} a una cena <b>gourmet</b> de las buenas</span></div>
+    <div class="fbar"><i style="width:${pct}%"></i></div>
+    <p class="fsub">Jornada <b>${gp}</b> de ${GAMES} · la liga regular acaba el ${fin}</p>
+  </div></div>`;
+}
+
+function viewGeneral(){
+  const sc=score(), max=Math.max(...sc.map(s=>s.total),1);
+  const medals=['🥇','🥈','🥉','4º'];
+  let h=feast(sc)+'<div class="cards">'+sc.map((s,i)=>`
+    <div class="card ${i===0?'first':''}">
+      <div class="rank">${medals[i]||i+1+'º'}</div>
+      <div class="who">${person(s.name,'big')}<div class="name">${s.name}</div></div>
+      <div class="total">${s.total}</div>
+      <div class="split"><span>Posiciones: <b>${s.base}</b></span><span>Bonus: <b>${s.bonus}</b></span>
+      ${i>0?`<span>A ${s.total-sc[0].total} del 1º</span>`:'<span>Líder</span>'}</div>
+      <div class="bar"><i style="width:${Math.max(4,100*s.total/max)}%"></i></div>
+    </div>`).join('')+'</div>';
+  h+='<h2>Resumen bonus</h2>'+betsTable();
+  return h;
+}
+
+function betsTable(){
+  let h='<div class="tablebox"><table><tr><th class="l">Apuesta</th>'+names.map(n=>`<th>${person(n)}${n}</th>`).join('')+'<th>Resultado</th></tr>';
+  for(const b of BETS){
+    const r=RESULTS[b.key];
+    h+=`<tr><td class="l"><b>${b.label}</b><br><small class="sub">${b.win} / ${b.fin}</small></td>`;
+    for(const n of names){
+      const bp=betPoints(n,b);
+      const tag = bp.state==='win'?`<span class="tag win">${bp.pts}</span>`:bp.state==='fin'?`<span class="tag fin">${bp.pts}</span>`:bp.state==='no'?`<span class="tag no">0</span>`:'';
+      h+=`<td><div class="team" style="justify-content:center">${pickImg(b,PLAYERS[n][b.key])}<span>${pickName(b,PLAYERS[n][b.key])}</span></div>${tag}</td>`;
+    }
+    const fin=(r.finalists||[]).map(x=>pickName(b,x)).join(', ');
+    h+=`<td>${r.winner?`<div class="team" style="justify-content:center">${pickImg(b,r.winner)}<b>${pickName(b,r.winner)}</b></div><br><small class="sub">${fin}</small>`:'<span class="tag">pendiente</span>'}</td></tr>`;
+  }
+  return h+'</table></div>';
+}
+
+function viewConf(c, title){
+  let h=`<h2>${title}</h2><div class="tablebox"><table><tr><th>#</th><th class="l">Equipo</th><th>PJ</th><th>G</th><th>P</th><th>Racha</th><th>Últ. 10</th>`+names.map(n=>`<th>${person(n)}${n}</th>`).join('')+'</tr>';
+  const pos={}; names.forEach(n=>PLAYERS[n][c].forEach((a,i)=>{(pos[a]=pos[a]||{})[n]=i+1;}));
+  for(const t of ORDER[c]){
+    h+=`<tr><td><b>${PRESEASON?'-':t.pos}</b></td><td class="l"><div class="team">${logo(t.abbr)}<span>${t.name}</span></div></td>
+      ${PRESEASON?'<td>0</td><td>0</td><td>0</td><td>-</td><td>-</td>':`<td>${t.gp}</td><td>${t.w}</td><td>${t.l}</td><td class="${t.streak[0]==='W'?'W':'L'}">${t.streak}</td><td>${t.l10}</td>`}`;
+    for(const n of names){
+      const bet=pos[t.abbr][n], d=PRESEASON?0:Math.abs(bet-t.pos);
+      h+=`<td><span class="cell" style="${dcolor(d)}"><b>${bet}º</b><small>${d} pt${d===1?'':'s'}</small></span></td>`;
+    }
+    h+='</tr>';
+  }
+  return h+'</table></div>';
+}
+function viewComp(){
+  return '<p class="sub">Cada celda: posición que apostó cada uno y los puntos que le suma ese equipo ahora mismo (menos = mejor).</p>'
+    +viewConf('E','Conferencia Este')+viewConf('W','Conferencia Oeste');
+}
+
+function viewPlayer(){
+  const sc=score(), me=sc.find(s=>s.name===selPlayer);
+  let h='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+names.map(n=>`<button class="pill ${n===selPlayer?'on':''}" data-p="${n}">${n}</button>`).join('')+'</div>';
+  h+=`<div class="card" style="margin-bottom:14px"><div class="who">${person(me.name,'big')}<div class="name">${me.name}</div></div><div class="total">${me.total}</div>
+    <div class="split"><span>Posiciones: <b>${me.base}</b></span><span>Bonus: <b>${me.bonus}</b></span><span>Puesto: <b>${sc.indexOf(me)+1}º</b></span></div></div>`;
+  h+='<div class="bets">';
+  for(const [c,title] of [['E','Este'],['W','Oeste']]){
+    h+=`<div><h3>${title}</h3><div class="tablebox"><table><tr><th>Apuesta</th><th class="l">Equipo</th><th>Real</th><th>Pts</th><th>Récord</th></tr>`;
+    for(const r of me.rows.filter(r=>r.conf===c)){
+      const t=TEAMS[r.abbr];
+      h+=`<tr><td>${r.bet}º</td><td class="l"><div class="team">${logo(r.abbr)}<span>${tname(r.abbr)}</span></div></td><td>${PRESEASON?'-':(r.real??'-')+'º'}</td>
+        <td><span class="cell" style="${dcolor(r.d)}"><b>${r.d}</b></span></td><td>${t&&!PRESEASON?t.w+'-'+t.l:'0-0'}</td></tr>`;
+    }
+    h+='</table></div></div>';
+  }
+  h+='</div><h2>Bonus</h2><div class="tablebox"><table><tr><th class="l">Apuesta</th><th class="l">Tu elección</th><th>Estado</th></tr>';
+  for(const b of BETS){
+    const bp=betPoints(selPlayer,b);
+    const st={pending:'<span class="tag">pendiente</span>',win:`<span class="tag win">ganada ${bp.pts}</span>`,fin:`<span class="tag fin">finalista ${bp.pts}</span>`,no:'<span class="tag no">fallada</span>'}[bp.state];
+    h+=`<tr><td class="l">${b.label}</td><td class="l"><div class="team">${pickImg(b,PLAYERS[selPlayer][b.key])}<span>${pickName(b,PLAYERS[selPlayer][b.key])}</span></div></td><td>${st}</td></tr>`;
+  }
+  return h+'</table></div>';
+}
+
+const TABS={general:['Marcador',viewGeneral],comp:['Comparativa y clasificación',viewComp],player:['Por jugador',viewPlayer]};
+
+function render(){
+  $('#tabs').innerHTML=Object.entries(TABS).map(([k,v])=>`<button data-t="${k}" class="${k===tab?'on':''}">${v[0]}</button>`).join('');
+  const warn='';
+  $('#view').innerHTML=Object.keys(TEAMS).length?warn+TABS[tab][1]():'';
+}
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-t]'), p=e.target.closest('[data-p]');
+  if(t){tab=t.dataset.t;render();} else if(p){selPlayer=p.dataset.p;render();}
+});
+
+async function load(){
+  const st=$('#status');
+  try{
+    const r=await fetch(API,{cache:'no-store'});
+    if(!r.ok) throw new Error(r.status);
+    const data=await r.json();
+    const p=parse(data);
+    TEAMS=p.teams; ORDER=p.order;
+    PRESEASON=isPre(data);
+    try{localStorage.setItem('nba-cache',JSON.stringify({t:Date.now(),data}));}catch(e){}
+    st.className='status'; st.textContent='Actualizado '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+' · se refresca solo';
+  }catch(err){
+    let cached=null; try{cached=JSON.parse(localStorage.getItem('nba-cache'));}catch(e){}
+    if(cached && !Object.keys(TEAMS).length){
+      const p=parse(cached.data); TEAMS=p.teams; ORDER=p.order; PRESEASON=isPre(cached.data);
+    }
+    st.className='status err';
+    st.textContent=cached?'Sin conexión con ESPN. Datos de '+new Date(cached.t).toLocaleString('es-ES'):'No se pudo cargar la clasificación';
+  }
+  render();
+}
+load(); setInterval(load,REFRESH_MS);
+</script>
+</body>
+</html>
