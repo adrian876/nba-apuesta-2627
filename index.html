@@ -438,7 +438,10 @@ document.addEventListener('change',e=>{
 
 // datos guardados por GitHub Actions en el propio repo
 async function loadRepoData(){
-  const get=f=>fetch(f+'?t='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
+  // si no se pueden leer los archivos locales (p. ej. abriendo el html con doble clic, file://), se leen del repo en GitHub
+  const RAW='https://raw.githubusercontent.com/adrian876/nba-apuesta-2627/main/';
+  const one=u=>fetch(u,{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
+  const get=async f=>(location.protocol.startsWith('http')&&await one(f+'?t='+Date.now()))||one(RAW+f+'?t='+Date.now());
   if(!names.length){
     const a=await get('data/apuestas.json');
     if(a){PLAYERS=a.players; RESULTS=a.results; names=Object.keys(PLAYERS); selPlayer=names[0];}
