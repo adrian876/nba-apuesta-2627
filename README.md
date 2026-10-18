@@ -22,6 +22,7 @@ Web estática para seguir en directo la apuesta de la temporada entre 4 amigos: 
 | `index.html` | **La web** (HTML, CSS y JS en un solo archivo, sin dependencias ni build). |
 | `data/apuestas.json` | **Las apuestas y los resultados de copa y premios.** Lo leen la web y el script. |
 | `data/calendario.json` | Calendario completo con resultados. Lo escribe GitHub Actions. |
+| `data/plantillas.json` | Plantilla actual de los 30 equipos (dorsal, posición, lesión) con las medias de temporada de cada jugador. Lo escribe GitHub Actions cada 6 h. |
 | `data/historial.json` | Puntuación de cada uno, un punto por día (fecha de Madrid). Lo escribe GitHub Actions. |
 | `scripts/update.mjs` | Script que actualiza el calendario y el historial con datos de ESPN. |
 | `.github/workflows/update.yml` | Tarea de GitHub Actions que ejecuta el script cada 30 min y hace commit si hay cambios. |
@@ -112,45 +113,61 @@ node scripts/update.mjs       # actualizar los datos a mano (necesita Node 18+)
 - El orden de equipos usa `playoffSeed` de ESPN, con desempate por porcentaje de victorias y diferencia de puntos.
 - Se quitó el pie de créditos de las fotos a petición del usuario. Las fotos de Wikimedia con licencia CC BY piden atribución si la web se difunde de forma abierta.
 
-## Idea pendiente: estadísticas de cada partido (probado el 18/10/2026, NO implementado)
+## Ficha de cada partido (Calendario)
 
-**Objetivo:** en el Calendario, al tocar un partido, ver la estadística de cada jugador. Las columnas serían minutos, puntos, rebotes, asistencias, robos, tiros (metidos/intentados), triples (metidos/intentados), % de tiro, % de triples, pérdidas y +/-.
+Al tocar un partido se abre su ficha, con "← Volver a la jornada" para salir.
 
-### Lo que se probó
+- **Partido jugado o en juego:** estadística de cada jugador con MIN, PTS, REB, AST, ROB, PÉR, TC (metidos-intentados), %TC, T3, %T3 y +/-.
+  - Salen primero los titulares (marcados con T), luego el banquillo, la fila de totales y "No jugaron".
+  - Se pide a ESPN en el momento, desde el navegador: `.../summary?event=<id>`, unos 40 KB. No se guarda en el repo.
+  - Si el partido está en directo, se refresca cada 30 s.
+- **Partido sin jugar:** las dos plantillas actuales con las medias por partido de cada jugador, ordenadas por puntos. Los lesionados salen marcados como "baja" (Out) o "duda" (resto).
+  - Sale de `data/plantillas.json`.
+  - Si la temporada actual aún no tiene partidos, ESPN devuelve la anterior, y la web lo indica ("temporada 2025-26, la pasada").
+- **Columna del nombre:** queda fija al deslizar la tabla de lado en el móvil.
 
-- **Endpoint:** `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=<id>`. El `<id>` es el `id` de cada partido en `data/calendario.json`.
-- **Se puede pedir desde el navegador:** responde con `access-control-allow-origin: *` y `cache-control: max-age=8`. No hace falta guardarlo en el repo, la web lo puede pedir al tocar el partido.
-- **Tamaño:** unos 40 KB por partido. Se pide solo al abrir uno.
-- **Probado con un partido jugado** (pretemporada, Jazz en Suns, 16/10/2026, id `401908948`). Funciona y trae todo lo pedido:
-  - `boxscore.players`: un elemento por equipo (`team.abbreviation`).
-  - `boxscore.players[i].statistics[0].labels`: `MIN, PTS, FG, 3PT, FT, REB, AST, TO, STL, BLK, OREB, DREB, PF, +/-`.
-  - `...statistics[0].athletes[]`: un elemento por jugador:
-    - `athlete.displayName`, `athlete.jersey`, `athlete.position.abbreviation` y `athlete.headshot.href` (foto).
-    - `starter` (titular sí o no) y `didNotPlay`.
-    - `stats`: array de textos en el mismo orden que `labels`. Ejemplo: `["27","19","5-12","3-7","6-6","5","1","0","1","0","1","4","1","0"]`.
-  - `...statistics[0].totals`: los totales del equipo, en el mismo orden.
-  - **FG y 3PT** vienen como `"metidos-intentados"` (`"5-12"`). **El % por jugador no viene**: hay que calcularlo (5/12 = 41,7 %). El % del equipo sí viene, en `boxscore.teams[i].statistics` ("Field Goal %", "Three Point %").
-  - **+/-** viene como texto: `"+10"`, `"0"`, `"-4"`.
-- **Jugadores que no jugaron:** tienen `didNotPlay: true` y `stats: []`. Ojo: el campo `reason` ("COACH'S DECISION") aparece también en jugadores que **sí** jugaron. Para saber si alguien jugó hay que usar `didNotPlay` o `stats` vacío, nunca `reason`.
-- **Probado con un partido sin jugar** (Celtics-Pistons, 20/10/2026, id `401909088`): `boxscore.players` viene **vacío** y el estado es `pre`. La web debería mostrar algo como "Las estadísticas aparecen cuando empiece el partido".
+### A quién le conviene que gane cada equipo
 
-### Lo que NO se pudo probar
+- **Regla simple, por participante y equipo:**
+  - Si el equipo va **peor** de lo que apostó (por ejemplo, lo puso 3º y va 7º), le conviene que **gane**: +1.
+  - Si va **mejor** de lo apostado, le conviene que **pierda**: -1.
+  - Si va justo donde lo puso: 0.
+- **En un partido A contra B:** se calcula `conviene(A) - conviene(B)`. Si sale positivo quiere que gane A, si sale negativo B, y si sale 0 le da igual.
+- **Dónde se ve:**
+  - En la lista de partidos, la foto de cada uno aparece junto al equipo que quiere que gane.
+  - En la ficha sale "Quieren que gane:" con las fotos, y un desplegable **"¿Por qué?"** con dónde apostó cada equipo y dónde va.
+- **No tiene en cuenta** cuántos puntos se juega cada uno ni a los rivales directos. Es orientativo.
+- **En pretemporada no se muestra.** Los primeros días de liga, con casi todos los equipos empatados, será poco fiable.
 
-- **Partidos en directo:** no había ninguno en juego. Es de esperar que `summary` vaya actualizando la estadística durante el partido (por eso el caché es de 8 s), pero hay que comprobarlo el **20/10/2026** con el primer partido de liga regular. Si funciona, la ficha del partido abierto se puede refrescar cada 30-60 s.
-- **Liga regular:** solo se probó con pretemporada. Se espera el mismo formato, a confirmar el 20/10.
+### Detalles técnicos de ESPN (probados el 18/10/2026)
 
-### Cómo se haría (plan)
+- **`summary?event=<id>`:** `boxscore.players[i].statistics[0]` trae:
+  - `labels`: `MIN, PTS, FG, 3PT, FT, REB, AST, TO, STL, BLK, OREB, DREB, PF, +/-`.
+  - `athletes[].stats`: los valores en ese orden.
+  - `totals`.
+- **El % por jugador no viene:** se calcula con `"metidos-intentados"`.
+- **Quién no jugó:** el campo `reason` ("COACH'S DECISION") sale también en jugadores que sí jugaron. Para saber quién no jugó se usa `didNotPlay` o `stats` vacío.
+- **Partido sin jugar:** `boxscore.players` viene vacío.
+- **Plantillas:** `teams/<id>/roster`, una petición por equipo.
+- **Medias de toda la liga en una sola petición:** `site.web.api.espn.com/apis/common/v3/sports/basketball/nba/statistics/byathlete?season=2027&seasontype=2&limit=1000`, unos 430 KB. Lo usa solo el script, no la web.
+- **Pendiente de comprobar el 20/10/2026:**
+  - Que la estadística en directo se actualiza durante el partido.
+  - Que `byathlete` pasa a dar la temporada 2026-27 cuando haya partidos jugados.
 
-1. **Calendario:** cada tarjeta de partido se puede tocar si su `st` es `in` o `post`.
-2. **Al tocarla:** se abre un panel con dos tablas, una por equipo, con los titulares primero y luego el banquillo.
-3. **Columnas:** MIN, PTS, REB, AST, STL, TO, FG, FG%, 3PT, 3P% y +/-. Los que no jugaron van al final en gris, con "No jugó".
-4. **Totales:** la fila de totales del equipo, con el % de tiro de `boxscore.teams`.
-5. **Móvil:** la tabla será ancha, así que la columna del nombre irá fija a la izquierda y el resto se deslizará de lado.
+## Tamaño y límites (medido el 18/10/2026)
+
+- **Web publicada:** unos 5 MB, casi todo fotos. El límite de GitHub Pages es 1 GB y cuenta solo los archivos actuales.
+- **Repo con historial:**
+  - Hoy ocupa 4,6 MB.
+  - Cada commit del bot añade, como mucho, unos 15 KB (calendario) y 21 KB (plantillas) comprimidos.
+  - Siendo pesimista, unos 60 MB en toda la temporada.
+- **Tráfico:** una primera visita descarga unos 5 MB, y las siguientes casi nada por la caché. El límite blando es de 100 GB al mes, y 4 personas no llegan a 1 GB.
 
 ## Pendiente
 
 - [ ] El **20/10/2026**, con los primeros partidos de liga regular, comprobar que la web pasa a datos reales y se refresca sola.
 - [ ] Rellenar `results` en `data/apuestas.json` cuando se sepan copa y premios.
-- [ ] Ideas pendientes: estadísticas de los jugadores apostados en premios, lesionados, y enlaces a los rankings de premios.
+- [ ] El **20/10/2026**: comprobar que la ficha en directo se refresca y que las medias pasan a la temporada 2026-27.
+- [ ] Ideas pendientes: estadísticas de los jugadores apostados en premios y enlaces a los rankings de premios.
 - [ ] Opcional: mejorar la foto de Telmo (la original es muy pequeña y borrosa).
 - [ ] Opcional: decidir si la web debe ser privada. Ahora es pública, con las caras recortadas y las apuestas visibles.

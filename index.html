@@ -120,6 +120,38 @@ th .av{width:30px;height:30px;display:block;margin:0 auto 3px}
 .gt b{font-size:18px;font-variant-numeric:tabular-nums}
 .gt.lose{opacity:.55}
 .gn{font-size:11px;color:var(--accent);margin-top:6px}
+button.game{display:block;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer}
+button.game:hover{border-color:var(--accent)}
+.gs .more{margin-left:auto;color:var(--accent);font-weight:600}
+.gt .fans{display:flex;gap:2px;font-style:normal}
+.fan{width:20px;height:20px;border-radius:50%;object-fit:cover;object-position:50% 15%;border:1.5px solid var(--card)}
+.ghead{margin:12px 0}
+.gside{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:4px 10px;padding:8px 0;border-top:1px solid var(--line)}
+.gside:first-of-type{border-top:0}
+.gside img{width:34px;height:34px;object-fit:contain}
+.gside .nm{font-size:16px}
+.gside .sc{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
+.gside.lose{opacity:.6}
+.gside .want{grid-column:2/4;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.gside .want small{color:var(--mute);font-size:12px}
+.fanb{width:28px;height:28px;border-radius:50%;object-fit:cover;object-position:50% 15%}
+.whys{margin-bottom:12px;padding:10px 14px}
+.whys summary{cursor:pointer;font-size:13px;color:var(--mute)}
+.why{display:flex;gap:10px;align-items:center;padding:6px 0;font-size:14px}
+.why .av{width:30px;height:30px}
+.why small{display:block;color:var(--mute);font-size:12px}
+h2.tn{display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;color:var(--text);font-size:17px}
+h2.tn img{width:28px;height:28px;object-fit:contain}
+.box th,.box td{padding:6px 7px;font-size:13px}
+.box th:first-child,.box td:first-child{position:sticky;left:0;background:var(--card);z-index:1;box-shadow:1px 0 0 var(--line)}
+.box th:first-child{background:var(--card2)}
+.box td.b{font-weight:800}
+.box .jn{display:inline-block;min-width:22px;color:var(--mute);font-size:11px}
+.box .st{color:var(--accent);font-weight:700}
+.box .inj{color:var(--bad);font-weight:700;font-size:10px;text-transform:uppercase}
+.box tr.sep td{background:var(--card2);color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:4px 8px}
+.box tr.tot td{font-weight:700;background:var(--card2)}
+.box tr.dnp td{color:var(--mute);font-size:12px;white-space:normal}
 </style>
 </head>
 <body>
@@ -140,7 +172,7 @@ th .av{width:30px;height:30px;display:block;margin:0 auto 3px}
    están en data/apuestas.json, compartidos con scripts/update.mjs.
    ============================================================ */
 let PLAYERS = {}, RESULTS = {};
-let CAL = null, HIST = null;   // data/calendario.json y data/historial.json (GitHub Actions)
+let CAL = null, HIST = null, PLANT = null;   // data/calendario.json y data/historial.json (GitHub Actions)
 
 const NAMES = {
   doncic:'Luka Dončić', duren:'Jalen Duren', mamukelashvili:'Sandro Mamukelashvili', sexton:'Collin Sexton',
@@ -359,12 +391,37 @@ async function liveDay(day){
   }catch(e){}
 }
 
-function viewCal(){
-  if(!CAL) return '<p class="sub">Cargando calendario…</p>';
+// +1: el equipo va peor de lo que apostó (le conviene que gane); -1: va mejor (le conviene que pierda)
+function lean(n,abbr){
+  const t=TEAMS[abbr]; if(!t) return 0;
+  const i=PLAYERS[n][t.conf].indexOf(abbr); if(i<0) return 0;
+  return Math.sign(t.pos-(i+1));
+}
+// quién quiere que gane cada equipo: compara lo que le conviene a cada uno con los dos equipos
+function fans(g){
+  const r={home:[],away:[]};
+  if(PRESEASON) return r;
+  for(const n of names){ const v=lean(n,g.away.t)-lean(n,g.home.t); if(v>0) r.away.push(n); else if(v<0) r.home.push(n); }
+  return r;
+}
+const fanImgs=(list,cls='fan')=>list.map(n=>`<img class="${cls}" src="img/people/${n}.jpg" alt="${n}" title="${n}">`).join('');
+
+function dayGames(){
   const games=CAL.games.filter(g=>dayIn(US,new Date(g.d))===calDay).map(g=>LIVE.day===calDay&&LIVE.games[g.id]?{...g,...LIVE.games[g.id]}:g);
   if(LIVE.day===calDay) for(const g of Object.values(LIVE.games)) if(!games.find(x=>x.id===g.id)) games.push(g);
-  games.sort((a,b)=>a.d.localeCompare(b.d));
+  return games.sort((a,b)=>a.d.localeCompare(b.d));
+}
+function gameStatus(g){
+  const t=new Date(g.d), hm=t.toLocaleTimeString('es-ES',{timeZone:TZ,hour:'2-digit',minute:'2-digit'});
+  const wd=dayIn(TZ,t)!==calDay?' · '+t.toLocaleDateString('es-ES',{timeZone:TZ,weekday:'short'}):'';
+  return g.st==='in'?`<span class="livedot"></span>${g.det}`:g.st==='post'?(g.det||'Final'):`${hm}${wd}`;
+}
+
+function viewCal(){
+  if(!CAL) return '<p class="sub">Cargando calendario…</p>';
+  const games=dayGames();
   liveDay(calDay);
+  if(openGame){ const g=games.find(x=>x.id===openGame)||CAL.games.find(x=>x.id===openGame); if(g) return viewGame(g); openGame=null; }
   const first=dayIn(US,new Date(CAL.games[0].d)), last=dayIn(US,new Date(CAL.games[CAL.games.length-1].d));
   const t0=new Date(calDay+'T12:00:00Z').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
   const title=t0.charAt(0).toUpperCase()+t0.slice(1);
@@ -375,17 +432,104 @@ function viewCal(){
     <button class="pill" data-cal="0">Hoy</button>
   </div>
   <p class="sub">${title}</p>
-  <p class="sub">Jornada de EE. UU.; las horas están en hora española.</p>`;
+  <p class="sub">Jornada de EE. UU.; las horas están en hora española. Toca un partido para ver las estadísticas. Las caras indican a quién le conviene que gane cada equipo.</p>`;
   if(!games.length) return h+'<div class="card"><p class="sub" style="margin:0">No hay partidos este día.</p></div>';
   h+='<div class="games">'+games.map(g=>{
-    const t=new Date(g.d), hm=t.toLocaleTimeString('es-ES',{timeZone:TZ,hour:'2-digit',minute:'2-digit'});
-    const wd=dayIn(TZ,t)!==calDay?' · '+t.toLocaleDateString('es-ES',{timeZone:TZ,weekday:'short'}):'';
-    const done=g.st==='post', on=g.st==='in';
+    const done=g.st==='post', on=g.st==='in', f=fans(g);
     const aw=done&&g.away.s>g.home.s, hw=done&&g.home.s>g.away.s;
-    const row=(s,win)=>`<div class="gt ${done&&!win?'lose':''}">${logo(s.t)}<span>${tname(s.t)}</span><b>${g.st==='pre'||s.s==null?'':s.s}</b></div>`;
-    const status=on?`<span class="livedot"></span>${g.det}`:done?(g.det||'Final'):`${hm}${wd}`;
-    return `<div class="card game"><div class="gs ${on?'on':''}">${status}</div>${row(g.away,aw)}${row(g.home,hw)}${g.note?`<div class="gn">${g.note}</div>`:''}</div>`;
+    const row=(s,win,fl)=>`<div class="gt ${done&&!win?'lose':''}">${logo(s.t)}<span>${tname(s.t)}</span><i class="fans">${fanImgs(fl)}</i><b>${g.st==='pre'||s.s==null?'':s.s}</b></div>`;
+    return `<button class="card game" data-game="${g.id}"><div class="gs ${on?'on':''}">${gameStatus(g)}<span class="more">Ver estadísticas ›</span></div>${row(g.away,aw,f.away)}${row(g.home,hw,f.home)}${g.note?`<div class="gn">${g.note}</div>`:''}</button>`;
   }).join('')+'</div>';
+  return h;
+}
+
+/* ---------- ficha de un partido ---------- */
+let openGame=null, BOX={id:null,at:0,data:null,err:false};
+
+async function loadBox(g){
+  const fresh=BOX.id===g.id&&BOX.data&&(g.st==='post'||Date.now()-BOX.at<25000);
+  if(fresh||(BOX.id===g.id&&BOX.loading)) return;
+  BOX={id:g.id,at:Date.now(),data:BOX.id===g.id?BOX.data:null,loading:true};
+  try{
+    const r=await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event='+g.id,{cache:'no-store'});
+    BOX={id:g.id,at:Date.now(),data:await r.json(),loading:false};
+  }catch(e){ BOX={id:g.id,at:Date.now(),data:null,err:true,loading:false}; }
+  if(tab==='cal'&&openGame===g.id) render();
+}
+
+const pct=(m,a)=>a>0?(100*m/a).toFixed(1).replace('.0',''):'–';
+const shortName=n=>{const p=n.split(' '); return p.length>1?p[0][0]+'. '+p.slice(1).join(' '):n;};
+const pm=v=>{const n=+v; return isNaN(n)?v:`<span class="${n>0?'W':n<0?'L':''}">${n>0?'+'+n:n}</span>`;};
+
+// tabla de la estadística del partido de un equipo (boxscore de ESPN)
+function boxTable(tp){
+  const st=tp.statistics[0], L={}; st.labels.forEach((l,i)=>L[l]=i);
+  const v=(arr,k)=>arr[L[k]]??'';
+  const split=x=>{const [m,a]=(x||'0-0').split('-').map(Number); return [m,a];};
+  const cells=arr=>{const [fm,fa]=split(v(arr,'FG')), [tm,ta]=split(v(arr,'3PT'));
+    return `<td>${v(arr,'MIN')}</td><td class="b">${v(arr,'PTS')}</td><td>${v(arr,'REB')}</td><td>${v(arr,'AST')}</td><td>${v(arr,'STL')}</td><td>${v(arr,'TO')}</td>
+      <td>${v(arr,'FG')}</td><td>${pct(fm,fa)}</td><td>${v(arr,'3PT')}</td><td>${pct(tm,ta)}</td><td>${pm(v(arr,'+/-'))}</td>`;};
+  const played=st.athletes.filter(a=>!a.didNotPlay&&a.stats&&a.stats.length), dnp=st.athletes.filter(a=>a.didNotPlay||!a.stats||!a.stats.length);
+  let h=`<div class="tablebox box"><table><tr><th class="l">Jugador</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>ROB</th><th>PÉR</th><th>TC</th><th>%TC</th><th>T3</th><th>%T3</th><th>+/-</th></tr>`;
+  played.forEach((a,i)=>{
+    if(i&&a.starter!==played[i-1].starter) h+='<tr class="sep"><td class="l" colspan="12">Banquillo</td></tr>';
+    h+=`<tr><td class="l"><span class="jn">${a.athlete.jersey||''}</span>${a.athlete.shortName||shortName(a.athlete.displayName)}${a.starter?' <small class="st">T</small>':''}</td>${cells(a.stats)}</tr>`;
+  });
+  if(st.totals&&st.totals.length) h+=`<tr class="tot"><td class="l">Total</td>${cells(st.totals).replace(/<td>[^<]*<\/td>/,'<td></td>')}</tr>`;
+  if(dnp.length) h+=`<tr class="dnp"><td class="l" colspan="12">No jugaron: ${dnp.map(a=>a.athlete.shortName||a.athlete.displayName).join(', ')}</td></tr>`;
+  return h+'</table></div>';
+}
+
+// plantilla con medias de la temporada (partido sin jugar)
+function rosterTable(abbr){
+  const list=(PLANT&&PLANT.teams[abbr]||[]).slice().sort((a,b)=>(b.s?b.s.pts:-1)-(a.s?a.s.pts:-1));
+  if(!list.length) return '<p class="sub">No hay plantilla guardada para este equipo.</p>';
+  const f=x=>x==null?'–':x;
+  let h=`<div class="tablebox box"><table><tr><th class="l">Jugador</th><th>PJ</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>ROB</th><th>PÉR</th><th>TC</th><th>%TC</th><th>T3</th><th>%T3</th></tr>`;
+  for(const p of list){
+    const s=p.s, inj=p.inj?` <small class="inj" title="${p.inj}">${/out/i.test(p.inj)?'baja':'duda'}</small>`:'';
+    h+=`<tr><td class="l"><span class="jn">${p.j}</span>${shortName(p.n)}${inj}</td>`+(s?
+      `<td>${s.gp}</td><td>${s.min}</td><td class="b">${s.pts}</td><td>${s.reb}</td><td>${s.ast}</td><td>${s.stl}</td><td>${s.to}</td><td>${s.fgm}-${s.fga}</td><td>${f(s.fgp)}</td><td>${s.tpm}-${s.tpa}</td><td>${f(s.tpp)}</td>`
+      :'<td colspan="11" class="sub" style="text-align:left">Sin partidos la temporada pasada</td>')+'</tr>';
+  }
+  return h+'</table></div>';
+}
+
+// por qué le conviene a cada uno: dónde apostó cada equipo y dónde va
+function whyLine(n,g){
+  const part=a=>{const t=TEAMS[a]; if(!t) return ''; const i=PLAYERS[n][t.conf].indexOf(a)+1; return `${a} apostó ${i}º, va ${t.pos}º`;};
+  const v=lean(n,g.away.t)-lean(n,g.home.t);
+  const want=v>0?`<b>${tname(g.away.t)}</b>`:v<0?`<b>${tname(g.home.t)}</b>`:'le da igual';
+  return `<div class="why">${person(n)}<div><b>${n}</b> → ${want}<small>${part(g.away.t)} · ${part(g.home.t)}</small></div></div>`;
+}
+
+function viewGame(g){
+  const done=g.st==='post', f=fans(g);
+  const sc=s=>g.st==='pre'||s.s==null?'':s.s;
+  const side=(s,fl,win)=>`<div class="gside ${done&&!win?'lose':''}">${logo(s.t)}<b class="nm">${tname(s.t)}</b><span class="sc">${sc(s)}</span>
+      <div class="want">${fl.length?`<small>Quieren que gane:</small>${fanImgs(fl,'fanb')}`:'<small>No le conviene a nadie en especial</small>'}</div></div>`;
+  let h=`<button class="pill" data-back>← Volver a la jornada</button>
+    <div class="card ghead"><div class="gs ${g.st==='in'?'on':''}">${gameStatus(g)}${g.note?' · '+g.note:''}</div>
+    ${side(g.away,f.away,done&&g.away.s>g.home.s)}${side(g.home,f.home,done&&g.home.s>g.away.s)}</div>`;
+  h+=PRESEASON?'<p class="sub">A quién le conviene cada equipo se calcula con la clasificación de liga regular, desde el 20/10.</p>'
+    :`<details class="card whys"><summary>¿Por qué? (dónde apostó cada uno y dónde va)</summary>${names.map(n=>whyLine(n,g)).join('')}</details>`;
+  const legend='<p class="sub">TC: tiros de campo (metidos-intentados) · T3: triples · ROB: robos · PÉR: pérdidas · T: titular</p>';
+  if(g.st==='pre'){
+    const cur=PLANT&&PLANT.season==='2026-27';
+    h+=`<p class="sub">Partido sin jugar: medias por partido de cada jugador en la temporada ${PLANT?PLANT.season:''}${cur?'':' (la temporada pasada, porque la actual todavía no tiene partidos)'}. Jugadores en la plantilla actual.</p>`+legend;
+    for(const s of [g.away,g.home]) h+=`<h2 class="tn">${logo(s.t)}${tname(s.t)}</h2>`+rosterTable(s.t);
+    return h;
+  }
+  loadBox(g);
+  const box=BOX.id===g.id&&BOX.data&&BOX.data.boxscore;
+  if(!box) return h+`<p class="sub">${BOX.err?'No se pudieron cargar las estadísticas de ESPN.':'Cargando estadísticas…'}</p>`;
+  const teams=box.players||[];
+  if(!teams.length) return h+'<p class="sub">ESPN aún no tiene estadísticas de jugadores para este partido.</p>';
+  h+=legend+(g.st==='in'?'<p class="sub">En directo: se actualiza cada 30 segundos.</p>':'');
+  for(const ab of [g.away.t,g.home.t]){
+    const tp=teams.find(t=>t.team.abbreviation===ab); if(!tp) continue;
+    h+=`<h2 class="tn">${logo(ab)}${tname(ab)}</h2>`+boxTable(tp);
+  }
   return h;
 }
 
@@ -459,10 +603,12 @@ function render(){
   $('#view').innerHTML=Object.keys(TEAMS).length&&names.length?TABS[tab][1]():'';
 }
 document.addEventListener('click',e=>{
-  const t=e.target.closest('[data-t]'), p=e.target.closest('[data-p]'), c=e.target.closest('[data-cal]');
-  if(t){tab=t.dataset.t;render();}
+  const t=e.target.closest('[data-t]'), p=e.target.closest('[data-p]'), c=e.target.closest('[data-cal]'), gm=e.target.closest('[data-game]'), bk=e.target.closest('[data-back]');
+  if(t){tab=t.dataset.t;openGame=null;render();}
+  else if(gm){openGame=gm.dataset.game;render();window.scrollTo(0,0);}
+  else if(bk){openGame=null;render();}
   else if(p){selPlayer=p.dataset.p;render();}
-  else if(c){const n=+c.dataset.cal; calDay=n?addDays(calDay,n):dayIn(US); render();}
+  else if(c){const n=+c.dataset.cal; calDay=n?addDays(calDay,n):dayIn(US); openGame=null; render();}
 });
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-info]'); if(!b) return;
@@ -484,8 +630,8 @@ async function loadRepoData(){
     if(a){PLAYERS=a.players; RESULTS=a.results; names=Object.keys(PLAYERS); selPlayer=names[0];}
   }
   const calOld=!CAL||Date.now()-calAt>600000;   // el calendario pesa: cada 10 min basta
-  const [c,h]=await Promise.all([calOld?get('data/calendario.json'):null,get('data/historial.json')]);
-  if(c){CAL=c; calAt=Date.now();} if(h) HIST=h;
+  const [c,h,pl]=await Promise.all([calOld?get('data/calendario.json'):null,get('data/historial.json'),calOld?get('data/plantillas.json'):null]);
+  if(c){CAL=c; calAt=Date.now();} if(h) HIST=h; if(pl) PLANT=pl;
 }
 let calAt=0;
 
@@ -514,6 +660,8 @@ async function load(){
   render();
 }
 load(); setInterval(load,REFRESH_MS);
+// ficha de un partido en directo: refrescar la estadística cada 30 s
+setInterval(()=>{ if(tab==='cal'&&openGame&&BOX.id===openGame&&!(BOX.data&&BOX.data.header&&BOX.data.header.competitions[0].status.type.state==='post')) render(); },30000);
 </script>
 </body>
 </html>

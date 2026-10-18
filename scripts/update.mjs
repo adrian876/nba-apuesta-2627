@@ -114,6 +114,49 @@ async function history(standings) {
   console.log('historial', today, JSON.stringify(pts));
 }
 
+// Plantillas actuales de los 30 equipos con las medias de temporada de cada jugador.
+// Si la temporada aún no tiene datos, ESPN devuelve la anterior (requestedSeason lo indica).
+const ROSTER = id => `${ESPN}/site/v2/sports/basketball/nba/teams/${id}/roster`;
+const PLAYER_STATS = `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/statistics/byathlete?season=2027&seasontype=2&limit=1000`;
+
+async function rosters(standings) {
+  const old = await readJSON('data/plantillas.json', null);
+  if (old && Date.now() - new Date(old.updated).getTime() < FULL_EVERY_MS) return;
+
+  const ps = await get(PLAYER_STATS);
+  const idx = {};
+  ps.categories.forEach(c => c.names.forEach((n, i) => idx[n] = [c.name, i]));
+  const val = (a, n) => { const [c, i] = idx[n]; const cat = a.categories.find(x => x.name === c); return cat ? +cat.values[i] : 0; };
+  const r1 = v => Math.round(v * 10) / 10;
+  const stats = {};
+  for (const a of ps.athletes) {
+    stats[a.athlete.id] = {
+      gp: val(a, 'gamesPlayed'), min: r1(val(a, 'avgMinutes')), pts: r1(val(a, 'avgPoints')),
+      reb: r1(val(a, 'avgRebounds')), ast: r1(val(a, 'avgAssists')), stl: r1(val(a, 'avgSteals')),
+      blk: r1(val(a, 'avgBlocks')), to: r1(val(a, 'avgTurnovers')),
+      fgm: r1(val(a, 'avgFieldGoalsMade')), fga: r1(val(a, 'avgFieldGoalsAttempted')), fgp: r1(val(a, 'fieldGoalPct')),
+      tpm: r1(val(a, 'avgThreePointFieldGoalsMade')), tpa: r1(val(a, 'avgThreePointFieldGoalsAttempted')), tpp: r1(val(a, 'threePointFieldGoalPct')),
+    };
+  }
+
+  const teams = {};
+  for (const ch of standings.children) for (const e of ch.standings.entries) {
+    const r = await get(ROSTER(e.team.id)).catch(() => null);
+    if (!r) { if (old && old.teams[e.team.abbreviation]) teams[e.team.abbreviation] = old.teams[e.team.abbreviation]; continue; }
+    teams[e.team.abbreviation] = r.athletes.map(a => {
+      const p = { id: a.id, n: a.displayName, j: a.jersey || '', p: (a.position && a.position.abbreviation) || '' };
+      const inj = a.injuries && a.injuries[0];
+      if (inj && inj.status) p.inj = inj.status;
+      if (stats[a.id]) p.s = stats[a.id];
+      return p;
+    });
+  }
+  const season = ps.requestedSeason ? ps.requestedSeason.displayName : '';
+  await writeJSON('data/plantillas.json', { updated: new Date().toISOString(), season, teams }, 0);
+  console.log('plantillas:', Object.keys(teams).length, 'equipos, estadísticas de', season);
+}
+
 const standings = await get(STANDINGS);
 await calendar(standings);
 await history(standings);
+await rosters(standings);
