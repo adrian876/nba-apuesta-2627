@@ -277,7 +277,8 @@ const BETS = [
   { key:'coach', label:'Entrenador',      short:'Entr.', win:-6, fin:-2 },
 ];
 
-const API = 'https://site.api.espn.com/apis/v2/sports/basketball/nba/standings';
+// siempre la clasificación de liga regular (sin seasontype, en pretemporada ESPN da la de pretemporada)
+const API = 'https://site.api.espn.com/apis/v2/sports/basketball/nba/standings?seasontype=2';
 const REFRESH_MS = 120000;
 
 /* ============================================================ */
@@ -372,11 +373,13 @@ function feast(sc){
   const gp=PRESEASON?0:Math.max(0,...Object.values(TEAMS).map(t=>t.gp));
   const pct=Math.min(100,Math.max(0,100*(now-start)/(end-start)));
   const fin=new Date(end).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'});
-  const who=`<b>${pa}</b> inviten a <b>${gu}</b>`;
+  // sin partidos de liga regular la clasificación está a 0-0 y el orden no significa nada
+  const started=Object.values(TEAMS).some(t=>t.gp>0);
+  const who=started?`<b>${pa}</b> inviten a <b>${gu}</b>`:'los <b>2 últimos</b> inviten a los <b>2 primeros</b>';
   return `<div class="feast"><div class="pics">${pics}</div><div class="txt">
     <div class="cd"><span class="big">${days}<small>${days===1?'día':'días'}</small></span><span>para que ${who} a una cena <b>gourmet</b> de las buenas 🍷</span></div>
     <div class="fbar"><i style="width:${pct}%"></i></div>
-    <p class="fsub">Jornada <b>${gp}</b> de ${GAMES} · fin de la liga regular: ${fin}</p>
+    <p class="fsub">${started?'':'De momento vais todos empatados a 0 · '}Jornada <b>${gp}</b> de ${GAMES} · fin de la liga regular: ${fin}</p>
   </div></div>`;
 }
 
@@ -848,20 +851,20 @@ function gameRow(g,t){
   const home=g.home.t===t, me=home?g.home:g.away, op=home?g.away:g.home, done=g.st==='post';
   const res=done?(me.s>op.s?'<b class="W">G</b>':'<b class="L">P</b>'):'';
   const when=new Date(g.d).toLocaleDateString('es-ES',{timeZone:TZ,day:'numeric',month:'short'})+(done?'':' · '+new Date(g.d).toLocaleTimeString('es-ES',{timeZone:TZ,hour:'2-digit',minute:'2-digit'}));
-  return `<button class="gr" data-game="${g.id}" data-gday="${dayIn(US,new Date(g.d))}"><span class="gw">${when}</span><span class="go">${home?'vs':'@'} ${logo(op.t)}${op.t}</span>${done?`${res}<span class="gsc">${me.s}-${op.s}</span>`:'<span class="gsc"></span>'}</button>`;
+  return `<button class="gr" data-game="${g.id}" data-gday="${dayIn(US,new Date(g.d))}"><span class="gw">${when}</span><span class="go">${home?'vs':'@'} ${logo(op.t)}${op.t}${g.type===1?' <small class="tag">pret.</small>':''}</span>${done?`${res}<span class="gsc">${me.s}-${op.s}</span>`:'<span class="gsc"></span>'}</button>`;
 }
 
 function viewTeamPage(t){
   const T=TEAMS[t]; if(!T) return backBtn()+'<p class="sub">Equipo no encontrado.</p>';
   loadTeamNews(t); loadInj();
-  const conf=T.conf==='E'?'Este':'Oeste', pre=PRESEASON?'<span class="tag">pretemporada</span>':'';
+  const conf=T.conf==='E'?'Este':'Oeste', none=!T.gp;   // sin partidos de liga regular todavía
   const st=T.streak||'-';
-  let h=backBtn()+`<div class="card thead">${logo(t)}<div><h2 class="tname">${T.name}</h2><span class="sub">${T.pos}º del ${conf} ${pre}</span></div></div>
+  let h=backBtn()+`<div class="card thead">${logo(t)}<div><h2 class="tname">${T.name}</h2><span class="sub">${none?`Conferencia ${conf} · la liga regular aún no ha empezado`:`${T.pos}º del ${conf}`}</span></div></div>
   <div class="kpis">
-    <div class="card kpi"><small>Puntos por partido</small><b>${T.pf.toFixed(1)}</b><span>${rankOf(t,'pf')}º de la liga</span></div>
-    <div class="card kpi"><small>Puntos en contra</small><b>${T.pa.toFixed(1)}</b><span>${rankOf(t,'pa',true)}º de la liga</span></div>
+    <div class="card kpi"><small>Puntos por partido</small><b>${none?'–':T.pf.toFixed(1)}</b><span>${none?'sin partidos':rankOf(t,'pf')+'º de la liga'}</span></div>
+    <div class="card kpi"><small>Puntos en contra</small><b>${none?'–':T.pa.toFixed(1)}</b><span>${none?'sin partidos':rankOf(t,'pa',true)+'º de la liga'}</span></div>
     <div class="card kpi"><small>Récord</small><b>${T.w}-${T.l}</b><span>${T.gp?(100*T.w/T.gp).toFixed(0)+' % victorias':'sin partidos'}</span></div>
-    <div class="card kpi"><small>Racha</small><b class="${st[0]==='W'?'W':st[0]==='L'?'L':''}">${st.replace('W','G').replace('L','P')}</b><span>Últimos 10: ${T.l10}</span></div>
+    <div class="card kpi"><small>Racha</small><b class="${st[0]==='W'?'W':st[0]==='L'?'L':''}">${st.replace('W','G').replace('L','P')}</b><span>Últimos 10: ${T.l10==='-'&&none?'–':T.l10}</span></div>
   </div>`;
   // lo que apostó cada uno
   h+='<h2>La apuesta</h2><div class="card tbets">'+names.map(n=>{const i=PLAYERS[n][T.conf].indexOf(t)+1, d=PRESEASON?null:Math.abs(i-T.pos);

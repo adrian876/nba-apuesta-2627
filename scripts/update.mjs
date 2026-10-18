@@ -3,7 +3,7 @@
 import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 
 const ESPN = 'https://site.api.espn.com/apis';
-const STANDINGS = `${ESPN}/v2/sports/basketball/nba/standings`;
+const STANDINGS = `${ESPN}/v2/sports/basketball/nba/standings?seasontype=2`;   // siempre liga regular
 const SCHEDULE = (id, type) => `${ESPN}/site/v2/sports/basketball/nba/teams/${id}/schedule?season=2027&seasontype=${type}`;
 const SCOREBOARD = d => `${ESPN}/site/v2/sports/basketball/nba/scoreboard?dates=${d}`;
 const FULL_EVERY_MS = 6 * 3600e3;   // reconstruir el calendario completo cada 6 h

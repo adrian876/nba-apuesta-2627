@@ -70,6 +70,16 @@ La clasificación solo cambia cuando **termina** un partido. No es en directo ju
 - **Eje:** está invertido, así que menos puntos aparecen más arriba.
 - **Fotos:** al final de cada línea sale la foto de cada uno con su puntuación. Si coinciden, se separan.
 
+### Clasificación: siempre la de liga regular
+
+- **Qué se pide:** tanto la web como el script piden `standings?seasontype=2`.
+- **Por qué:** sin ese parámetro, ESPN devuelve la clasificación del tipo de temporada en curso, y en pretemporada eso es la pretemporada. Lo comprobamos el 18/10/2026: sin el parámetro, los Spurs salían 2-3; con él, 0-0.
+- **Qué se ve hasta el primer partido de liga regular:**
+  - Todo a 0-0.
+  - La página de equipo pone "la liga regular aún no ha empezado".
+  - El cartel de la cena dice que vais todos empatados.
+- **Partidos en las páginas de equipo:** en "Últimos partidos" los de pretemporada llevan la etiqueta "pret.".
+
 ## Cómo modificar cosas
 
 - **Apuestas:** `players` en `data/apuestas.json`. Los equipos van por abreviatura de ESPN (`NY`, `SA`, `GS`, `NO`, `UTAH`, `LAL`...) en orden de posición 1 a 15. Los premios usan un id (`wembanyama`, `doncic`...).
