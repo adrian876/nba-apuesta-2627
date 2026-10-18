@@ -75,6 +75,25 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;background:var(--bg);op
 .av.big{width:56px;height:56px}
 .who{display:flex;align-items:center;gap:10px}
 th .av{width:30px;height:30px;display:block;margin:0 auto 3px}
+.chart{padding:8px 4px}
+.chart svg{display:block}
+.chart .gl{stroke:var(--line);stroke-width:1}
+.chart .ax{fill:var(--mute);font-size:11px}
+.chart .lb{fill:var(--text);font-size:13px;font-weight:600}
+.chart .lv{font-weight:800}
+.calbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.calbar input{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font:inherit}
+.games{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.game{padding:12px 14px}
+.gs{font-size:12px;color:var(--mute);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.gs.on{color:var(--bad);font-weight:700}
+.livedot{width:8px;height:8px;border-radius:50%;background:var(--bad);display:inline-block}
+.gt{display:flex;align-items:center;gap:8px;padding:3px 0}
+.gt img{width:26px;height:26px;object-fit:contain}
+.gt span{flex:1}
+.gt b{font-size:18px;font-variant-numeric:tabular-nums}
+.gt.lose{opacity:.55}
+.gn{font-size:11px;color:var(--accent);margin-top:6px}
 </style>
 </head>
 <body>
@@ -91,23 +110,11 @@ th .av{width:30px;height:30px;display:block;margin:0 auto 3px}
 
 <script>
 /* ============================================================
-   DATOS DE LA APUESTA (fijos)
-   Equipos por abreviatura de ESPN. Orden = posición apostada (1..15)
+   Las apuestas (PLAYERS) y los resultados de copa y premios (RESULTS)
+   están en data/apuestas.json, compartidos con scripts/update.mjs.
    ============================================================ */
-const PLAYERS = {
-  Ghali:  { E:['NY','PHI','BOS','DET','MIA','IND','TOR','CLE','ATL','ORL','WSH','CHI','BKN','CHA','MIL'],
-            W:['SA','OKC','MIN','LAL','DEN','DAL','GS','PHX','POR','HOU','LAC','MEM','SAC','UTAH','NO'],
-            cup:'MIA', mvp:'doncic', dpoy:'duren', mip:'mamukelashvili', sixth:'sexton', coach:'spoelstra' },
-  Telmo:  { E:['CLE','NY','PHI','IND','MIA','BOS','TOR','ATL','WSH','CHA','DET','ORL','CHI','BKN','MIL'],
-            W:['OKC','LAL','SA','MIN','DEN','UTAH','DAL','HOU','PHX','GS','POR','LAC','MEM','NO','SAC'],
-            cup:'LAL', mvp:'doncic', dpoy:'wembanyama', mip:'harper', sixth:'hezonja', coach:'redick' },
-  Manu:   { E:['CLE','NY','BOS','PHI','MIA','IND','DET','ATL','ORL','TOR','CHA','CHI','WSH','BKN','MIL'],
-            W:['SA','OKC','DEN','LAL','MIN','HOU','GS','DAL','PHX','UTAH','POR','LAC','SAC','NO','MEM'],
-            cup:'SA', mvp:'jokic', dpoy:'wembanyama', mip:'buzelis', sixth:'dosunmu', coach:'mazzulla' },
-  Adrian: { E:['NY','CLE','DET','PHI','MIA','BOS','TOR','CHA','IND','ORL','ATL','WSH','CHI','BKN','MIL'],
-            W:['OKC','SA','MIN','DEN','LAL','DAL','HOU','GS','PHX','POR','UTAH','LAC','MEM','SAC','NO'],
-            cup:'LAL', mvp:'wembanyama', dpoy:'wembanyama', mip:'queta', sixth:'portis', coach:'mjohnson' },
-};
+let PLAYERS = {}, RESULTS = {};
+let CAL = null, HIST = null;   // data/calendario.json y data/historial.json (GitHub Actions)
 
 const NAMES = {
   doncic:'Luka Dončić', duren:'Jalen Duren', mamukelashvili:'Sandro Mamukelashvili', sexton:'Collin Sexton',
@@ -116,21 +123,7 @@ const NAMES = {
   mazzulla:'Joe Mazzulla', queta:'Neemias Queta', portis:'Bobby Portis', mjohnson:'Mitch Johnson',
 };
 
-/* ============================================================
-   RESULTADOS DE COPA Y PREMIOS (se rellenan a mano cuando se sepan)
-   winner: id del ganador (o abreviatura de equipo en la copa)
-   finalists: ids de los finalistas (MVP/DPOY: los 3 finalistas; copa: los 2 equipos de la final)
-   Dejar winner:null mientras no se sepa.
-   ============================================================ */
-const RESULTS = {
-  cup:   { winner:null, finalists:[] },
-  mvp:   { winner:null, finalists:[] },
-  dpoy:  { winner:null, finalists:[] },
-  mip:   { winner:null, finalists:[] },
-  sixth: { winner:null, finalists:[] },
-  coach: { winner:null, finalists:[] },
-};
-
+// Puntos de los bonus; deben coincidir con BETS de scripts/update.mjs
 const BETS = [
   { key:'cup',   label:'Copa',            win:-6, fin:-2, team:true },
   { key:'mvp',   label:'MVP',             win:-3, fin:-1 },
@@ -149,10 +142,14 @@ let ORDER = {E:[],W:[]};
 let PRESEASON = false;
 let REG = { start:'2026-10-20T07:00:00Z', end:'2027-04-12T06:59:00Z' };
 const GAMES = 82;
-let tab = 'general', selPlayer = Object.keys(PLAYERS)[0];
+let tab = 'general', selPlayer = null;
+let names = [];
 
 const $ = s => document.querySelector(s);
-const names = Object.keys(PLAYERS);
+const COLORS = {Ghali:'#f59e0b', Telmo:'#38bdf8', Manu:'#e879f9', Adrian:'#4ade80'};
+const TZ = 'Europe/Madrid', US = 'America/New_York';
+const dayIn = (tz, d=new Date()) => new Intl.DateTimeFormat('en-CA',{timeZone:tz}).format(d);
+const addDays = (day, n) => { const d=new Date(day+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); };
 
 function parse(data){
   const teams = {}, order = {E:[],W:[]};
@@ -204,7 +201,8 @@ function score(force){
 }
 
 const tname = a => TEAMS[a]?TEAMS[a].name:a;
-const logo = a => TEAMS[a]&&TEAMS[a].logo?`<img src="${TEAMS[a].logo}" alt="" loading="lazy">`:'';
+const logoUrl = a => TEAMS[a]&&TEAMS[a].logo || `https://a.espncdn.com/i/teamlogos/nba/500/${a.toLowerCase()}.png`;
+const logo = a => `<img src="${logoUrl(a)}" alt="" loading="lazy">`;
 const JPG = {redick:1,spoelstra:1,mazzulla:1};
 const person = (n,cls='') => `<img class="av ${cls}" src="img/people/${n}.jpg" alt="${n}">`;
 const pickImg = (b,id) => b.team ? logo(id) : `<img class="av" src="img/awards/${id}.${JPG[id]?'jpg':'png'}" alt="" loading="lazy" onerror="this.style.display='none'">`;
@@ -250,7 +248,116 @@ function viewGeneral(){
       ${i>0?`<span>A ${s.total-sc[0].total} del 1º</span>`:'<span>Líder</span>'}</div>
       <div class="bar"><i style="width:${Math.max(4,100*s.total/max)}%"></i></div>
     </div>`).join('')+'</div>';
+  h+='<h2>Evolución</h2>'+chart();
   h+='<h2>Resumen bonus</h2>'+betsTable();
+  return h;
+}
+
+/* ---------- gráfico de evolución: un punto por día ---------- */
+function chart(){
+  const days=(HIST&&HIST.days||[]).map(x=>({d:x.d,pts:Object.fromEntries(Object.entries(x.pts).map(([n,v])=>[n,v[0]]))}));
+  // el día de hoy siempre con la puntuación en vivo
+  const today=dayIn(TZ), live={d:today,pts:Object.fromEntries(score().map(s=>[s.name,s.total]))};
+  const i=days.findIndex(x=>x.d===today); if(i>=0) days[i]=live; else days.push(live);
+  days.sort((a,b)=>a.d.localeCompare(b.d));
+
+  const W=Math.max(340,Math.min(1068,(window.innerWidth||800)-34)), H=320, L=38, R=150, T=24, B=30;
+  const first=days[0].d, idx=d=>Math.round((new Date(d)-new Date(first))/864e5);
+  const span=Math.max(6,idx(days[days.length-1].d));
+  const vals=days.flatMap(x=>names.map(n=>x.pts[n]).filter(v=>v!=null));
+  let lo=Math.min(...vals), hi=Math.max(...vals);
+  if(hi-lo<10){const m=(hi+lo)/2; lo=m-5; hi=m+5;}
+  const pad=(hi-lo)*.08; lo-=pad; hi+=pad;
+  const X=d=>L+idx(d)/span*(W-L-R), Y=v=>T+(v-lo)/(hi-lo)*(H-T-B);   // menos puntos = más arriba
+
+  let g='';
+  for(let k=0;k<=4;k++){
+    const v=lo+(hi-lo)*k/4, y=Y(v);
+    g+=`<line x1="${L}" x2="${W-R+10}" y1="${y}" y2="${y}" class="gl"/><text x="${L-6}" y="${y+4}" text-anchor="end" class="ax">${Math.round(v)}</text>`;
+  }
+  const step=Math.ceil(span/Math.max(2,Math.floor((W-L-R)/70)));
+  for(let k=0;k<=span;k+=step){
+    const d=addDays(first,k);
+    g+=`<text x="${X(d)}" y="${H-8}" text-anchor="middle" class="ax">${new Date(d+'T12:00:00Z').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</text>`;
+  }
+  const ends=[];
+  for(const n of names){
+    const pts=days.filter(x=>x.pts[n]!=null).map(x=>[X(x.d),Y(x.pts[n])]);
+    if(!pts.length) continue;
+    g+=`<polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="${COLORS[n]}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`;
+    g+=pts.map(([x,y])=>`<circle cx="${x}" cy="${y}" r="3.5" fill="${COLORS[n]}"/>`).join('');
+    const [x,y]=pts[pts.length-1];
+    ends.push({n,x,y,ly:y,v:days.filter(d=>d.pts[n]!=null).at(-1).pts[n]});
+  }
+  // separar las fotos cuando coinciden
+  ends.sort((a,b)=>a.y-b.y);
+  for(let k=1;k<ends.length;k++) ends[k].ly=Math.max(ends[k].ly,ends[k-1].ly+38);
+  const over=ends.length?ends[ends.length-1].ly-(H-B-16):0;
+  if(over>0) ends.forEach(e=>e.ly-=over);
+  for(const e of ends){
+    const ax=e.x+30;
+    g+=`<line x1="${e.x}" y1="${e.y}" x2="${ax-18}" y2="${e.ly}" stroke="${COLORS[e.n]}" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <clipPath id="cp-${e.n}"><circle cx="${ax}" cy="${e.ly}" r="16"/></clipPath>
+      <image href="img/people/${e.n}.jpg" x="${ax-16}" y="${e.ly-16}" width="32" height="32" clip-path="url(#cp-${e.n})" preserveAspectRatio="xMidYMid slice"/>
+      <circle cx="${ax}" cy="${e.ly}" r="16" fill="none" stroke="${COLORS[e.n]}" stroke-width="3"/>
+      <text x="${ax+24}" y="${e.ly+5}" class="lb">${e.n} <tspan class="lv">${e.v}</tspan></text>`;
+  }
+  const note=PRESEASON?' Hasta que empiece la liga regular todos están a 0.':'';
+  return `<p class="sub">Puntuación de cada uno, un punto por día. Menos puntos = más arriba.${note}</p>
+    <div class="tablebox chart"><svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Evolución de la puntuación">${g}</svg></div>`;
+}
+
+/* ---------- calendario ---------- */
+let calDay = null, LIVE = {day:null, at:0, games:{}};
+
+function normGame(e){
+  const c=e.competitions[0], st=(e.status||c.status||{}).type||{};
+  const side=h=>{const t=c.competitors.find(x=>x.homeAway===h); const s=t.score==null?null:typeof t.score==='object'?t.score.displayValue:t.score;
+    return {t:t.team.abbreviation, s:s==null||s===''?null:+s};};
+  const g={id:e.id,d:e.date,home:side('home'),away:side('away'),st:st.state||'pre',det:st.shortDetail||''};
+  const note=c.notes&&c.notes[0]&&c.notes[0].headline; if(note) g.note=note;
+  return g;
+}
+
+// marcadores en vivo de ESPN para el día elegido si es ayer, hoy o mañana
+async function liveDay(day){
+  const today=dayIn(US);
+  if(Math.abs((new Date(day)-new Date(today))/864e5)>1) return;
+  if(LIVE.day===day && Date.now()-LIVE.at<60000) return;
+  try{
+    const r=await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates='+day.replaceAll('-',''),{cache:'no-store'});
+    const d=await r.json();
+    LIVE={day,at:Date.now(),games:Object.fromEntries((d.events||[]).map(e=>[e.id,normGame(e)]))};
+    if(tab==='cal' && calDay===day) render();
+  }catch(e){}
+}
+
+function viewCal(){
+  if(!CAL) return '<p class="sub">Cargando calendario…</p>';
+  const games=CAL.games.filter(g=>dayIn(US,new Date(g.d))===calDay).map(g=>LIVE.day===calDay&&LIVE.games[g.id]?{...g,...LIVE.games[g.id]}:g);
+  if(LIVE.day===calDay) for(const g of Object.values(LIVE.games)) if(!games.find(x=>x.id===g.id)) games.push(g);
+  games.sort((a,b)=>a.d.localeCompare(b.d));
+  liveDay(calDay);
+  const first=dayIn(US,new Date(CAL.games[0].d)), last=dayIn(US,new Date(CAL.games[CAL.games.length-1].d));
+  const title=new Date(calDay+'T12:00:00Z').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
+  let h=`<div class="calbar">
+    <button class="pill" data-cal="-1" aria-label="Día anterior">◀</button>
+    <input type="date" id="calpick" value="${calDay}" min="${first}" max="${last}">
+    <button class="pill" data-cal="1" aria-label="Día siguiente">▶</button>
+    <button class="pill" data-cal="0">Hoy</button>
+  </div>
+  <p class="sub" style="text-transform:capitalize">${title}</p>
+  <p class="sub">Jornada de EE. UU.; las horas están en hora española.</p>`;
+  if(!games.length) return h+'<div class="card"><p class="sub" style="margin:0">No hay partidos este día.</p></div>';
+  h+='<div class="games">'+games.map(g=>{
+    const t=new Date(g.d), hm=t.toLocaleTimeString('es-ES',{timeZone:TZ,hour:'2-digit',minute:'2-digit'});
+    const wd=dayIn(TZ,t)!==calDay?' · '+t.toLocaleDateString('es-ES',{timeZone:TZ,weekday:'short'}):'';
+    const done=g.st==='post', on=g.st==='in';
+    const aw=done&&g.away.s>g.home.s, hw=done&&g.home.s>g.away.s;
+    const row=(s,win)=>`<div class="gt ${done&&!win?'lose':''}">${logo(s.t)}<span>${tname(s.t)}</span><b>${g.st==='pre'||s.s==null?'':s.s}</b></div>`;
+    const status=on?`<span class="livedot"></span>${g.det}`:done?(g.det||'Final'):`${hm}${wd}`;
+    return `<div class="card game"><div class="gs ${on?'on':''}">${status}</div>${row(g.away,aw)}${row(g.home,hw)}${g.note?`<div class="gn">${g.note}</div>`:''}</div>`;
+  }).join('')+'</div>';
   return h;
 }
 
@@ -313,20 +420,40 @@ function viewPlayer(){
   return h+'</table></div>';
 }
 
-const TABS={general:['Marcador',viewGeneral],comp:['Comparativa y clasificación',viewComp],player:['Por jugador',viewPlayer]};
+const TABS={general:['Marcador',viewGeneral],comp:['Comparativa y clasificación',viewComp],player:['Por jugador',viewPlayer],cal:['Calendario',viewCal]};
 
 function render(){
   $('#tabs').innerHTML=Object.entries(TABS).map(([k,v])=>`<button data-t="${k}" class="${k===tab?'on':''}">${v[0]}</button>`).join('');
-  const warn='';
-  $('#view').innerHTML=Object.keys(TEAMS).length?warn+TABS[tab][1]():'';
+  $('#view').innerHTML=Object.keys(TEAMS).length&&names.length?TABS[tab][1]():'';
 }
 document.addEventListener('click',e=>{
-  const t=e.target.closest('[data-t]'), p=e.target.closest('[data-p]');
-  if(t){tab=t.dataset.t;render();} else if(p){selPlayer=p.dataset.p;render();}
+  const t=e.target.closest('[data-t]'), p=e.target.closest('[data-p]'), c=e.target.closest('[data-cal]');
+  if(t){tab=t.dataset.t;render();}
+  else if(p){selPlayer=p.dataset.p;render();}
+  else if(c){const n=+c.dataset.cal; calDay=n?addDays(calDay,n):dayIn(US); render();}
 });
+document.addEventListener('change',e=>{
+  if(e.target.id==='calpick'&&e.target.value){calDay=e.target.value;render();}
+});
+
+// datos guardados por GitHub Actions en el propio repo
+async function loadRepoData(){
+  const get=f=>fetch(f+'?t='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
+  if(!names.length){
+    const a=await get('data/apuestas.json');
+    if(a){PLAYERS=a.players; RESULTS=a.results; names=Object.keys(PLAYERS); selPlayer=names[0];}
+  }
+  const calOld=!CAL||Date.now()-calAt>600000;   // el calendario pesa: cada 10 min basta
+  const [c,h]=await Promise.all([calOld?get('data/calendario.json'):null,get('data/historial.json')]);
+  if(c){CAL=c; calAt=Date.now();} if(h) HIST=h;
+}
+let calAt=0;
 
 async function load(){
   const st=$('#status');
+  if(!calDay) calDay=dayIn(US);
+  await loadRepoData();
+  if(!names.length){st.className='status err';st.textContent='No se pudieron cargar las apuestas (data/apuestas.json)';return;}
   try{
     const r=await fetch(API,{cache:'no-store'});
     if(!r.ok) throw new Error(r.status);

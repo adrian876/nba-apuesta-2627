@@ -1,0 +1,32 @@
+{
+  "players": {
+    "Ghali": {
+      "E": ["NY","PHI","BOS","DET","MIA","IND","TOR","CLE","ATL","ORL","WSH","CHI","BKN","CHA","MIL"],
+      "W": ["SA","OKC","MIN","LAL","DEN","DAL","GS","PHX","POR","HOU","LAC","MEM","SAC","UTAH","NO"],
+      "cup": "MIA", "mvp": "doncic", "dpoy": "duren", "mip": "mamukelashvili", "sixth": "sexton", "coach": "spoelstra"
+    },
+    "Telmo": {
+      "E": ["CLE","NY","PHI","IND","MIA","BOS","TOR","ATL","WSH","CHA","DET","ORL","CHI","BKN","MIL"],
+      "W": ["OKC","LAL","SA","MIN","DEN","UTAH","DAL","HOU","PHX","GS","POR","LAC","MEM","NO","SAC"],
+      "cup": "LAL", "mvp": "doncic", "dpoy": "wembanyama", "mip": "harper", "sixth": "hezonja", "coach": "redick"
+    },
+    "Manu": {
+      "E": ["CLE","NY","BOS","PHI","MIA","IND","DET","ATL","ORL","TOR","CHA","CHI","WSH","BKN","MIL"],
+      "W": ["SA","OKC","DEN","LAL","MIN","HOU","GS","DAL","PHX","UTAH","POR","LAC","SAC","NO","MEM"],
+      "cup": "SA", "mvp": "jokic", "dpoy": "wembanyama", "mip": "buzelis", "sixth": "dosunmu", "coach": "mazzulla"
+    },
+    "Adrian": {
+      "E": ["NY","CLE","DET","PHI","MIA","BOS","TOR","CHA","IND","ORL","ATL","WSH","CHI","BKN","MIL"],
+      "W": ["OKC","SA","MIN","DEN","LAL","DAL","HOU","GS","PHX","POR","UTAH","LAC","MEM","SAC","NO"],
+      "cup": "LAL", "mvp": "wembanyama", "dpoy": "wembanyama", "mip": "queta", "sixth": "portis", "coach": "mjohnson"
+    }
+  },
+  "results": {
+    "cup":   { "winner": null, "finalists": [] },
+    "mvp":   { "winner": null, "finalists": [] },
+    "dpoy":  { "winner": null, "finalists": [] },
+    "mip":   { "winner": null, "finalists": [] },
+    "sixth": { "winner": null, "finalists": [] },
+    "coach": { "winner": null, "finalists": [] }
+  }
+}
