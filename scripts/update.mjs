@@ -1,6 +1,6 @@
 // Actualiza data/calendario.json y data/historial.json con datos de ESPN.
 // Lo ejecuta GitHub Actions (.github/workflows/update.yml). En local: node scripts/update.mjs
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 
 const ESPN = 'https://site.api.espn.com/apis';
 const STANDINGS = `${ESPN}/v2/sports/basketball/nba/standings`;
@@ -156,7 +156,43 @@ async function rosters(standings) {
   console.log('plantillas:', Object.keys(teams).length, 'equipos, estadísticas de', season);
 }
 
+// Copia de seguridad de la estadística de cada partido terminado: data/partidos/<id>.json.
+// Misma forma que boxscore.players de ESPN pero solo con los campos que usa la web.
+// La web la usa solo si ESPN falla. Como mucho BACKUP_PER_RUN partidos por ejecución.
+const SUMMARY = id => `${ESPN}/site/v2/sports/basketball/nba/summary?event=${id}`;
+const BACKUP_PER_RUN = 60;
+
+async function backups() {
+  await mkdir('data/partidos', { recursive: true });
+  const have = new Set((await readdir('data/partidos')).map(f => f.replace('.json', '')));
+  const cal = await readJSON('data/calendario.json', { games: [] });
+  const todo = cal.games.filter(g => g.st === 'post' && !have.has(g.id)).slice(0, BACKUP_PER_RUN);
+  let saved = 0;
+  for (const g of todo) {
+    const d = await get(SUMMARY(g.id)).catch(() => null);
+    const players = d && d.boxscore && d.boxscore.players;
+    if (!players || !players.length) continue;   // aún sin estadística: se reintenta en la siguiente ejecución
+    const slim = players.map(tp => {
+      const st = tp.statistics[0];
+      return {
+        team: { abbreviation: tp.team.abbreviation },
+        statistics: [{
+          labels: st.labels, totals: st.totals,
+          athletes: st.athletes.map(a => ({
+            athlete: { displayName: a.athlete.displayName, shortName: a.athlete.shortName, jersey: a.athlete.jersey },
+            starter: !!a.starter, didNotPlay: !!a.didNotPlay, stats: a.stats || [],
+          })),
+        }],
+      };
+    });
+    await writeJSON(`data/partidos/${g.id}.json`, { id: g.id, d: g.d, home: g.home, away: g.away, boxscore: { players: slim } }, 0);
+    saved++;
+  }
+  console.log('copias de partidos:', saved, 'nuevas,', have.size + saved, 'en total');
+}
+
 const standings = await get(STANDINGS);
 await calendar(standings);
 await history(standings);
 await rosters(standings);
+await backups();

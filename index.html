@@ -450,10 +450,18 @@ async function loadBox(g){
   const fresh=BOX.id===g.id&&BOX.data&&(g.st==='post'||Date.now()-BOX.at<25000);
   if(fresh||(BOX.id===g.id&&BOX.loading)) return;
   BOX={id:g.id,at:Date.now(),data:BOX.id===g.id?BOX.data:null,loading:true};
+  let data=null;
   try{
     const r=await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event='+g.id,{cache:'no-store'});
-    BOX={id:g.id,at:Date.now(),data:await r.json(),loading:false};
-  }catch(e){ BOX={id:g.id,at:Date.now(),data:null,err:true,loading:false}; }
+    if(r.ok) data=await r.json();
+  }catch(e){}
+  // si ESPN falla o no trae jugadores de un partido terminado, usar la copia guardada en el repo
+  let backup=false;
+  if(g.st==='post'&&!(data&&data.boxscore&&data.boxscore.players&&data.boxscore.players.length)){
+    const b=await repoJSON('data/partidos/'+g.id+'.json');
+    if(b){data=b; backup=true;}
+  }
+  BOX={id:g.id,at:Date.now(),data,err:!data,backup,loading:false};
   if(tab==='cal'&&openGame===g.id) render();
 }
 
@@ -507,11 +515,11 @@ function viewGame(g){
   const done=g.st==='post', f=fans(g);
   const sc=s=>g.st==='pre'||s.s==null?'':s.s;
   const side=(s,fl,win)=>`<div class="gside ${done&&!win?'lose':''}">${logo(s.t)}<b class="nm">${tname(s.t)}</b><span class="sc">${sc(s)}</span>
-      <div class="want">${fl.length?`<small>Quieren que gane:</small>${fanImgs(fl,'fanb')}`:'<small>No le conviene a nadie en especial</small>'}</div></div>`;
+      ${PRESEASON?'':`<div class="want">${fl.length?`<small>Quieren que gane:</small>${fanImgs(fl,'fanb')}`:'<small>No le conviene a nadie en especial</small>'}</div>`}</div>`;
   let h=`<button class="pill" data-back>← Volver a la jornada</button>
     <div class="card ghead"><div class="gs ${g.st==='in'?'on':''}">${gameStatus(g)}${g.note?' · '+g.note:''}</div>
     ${side(g.away,f.away,done&&g.away.s>g.home.s)}${side(g.home,f.home,done&&g.home.s>g.away.s)}</div>`;
-  h+=PRESEASON?'<p class="sub">A quién le conviene cada equipo se calcula con la clasificación de liga regular, desde el 20/10.</p>'
+  h+=PRESEASON?'<p class="sub">Quién quiere que gane cada equipo aparecerá desde el 20/10: se calcula con la clasificación de liga regular, y la de pretemporada no cuenta.</p>'
     :`<details class="card whys"><summary>¿Por qué? (dónde apostó cada uno y dónde va)</summary>${names.map(n=>whyLine(n,g)).join('')}</details>`;
   const legend='<p class="sub">TC: tiros de campo (metidos-intentados) · T3: triples · ROB: robos · PÉR: pérdidas · T: titular</p>';
   if(g.st==='pre'){
@@ -525,7 +533,8 @@ function viewGame(g){
   if(!box) return h+`<p class="sub">${BOX.err?'No se pudieron cargar las estadísticas de ESPN.':'Cargando estadísticas…'}</p>`;
   const teams=box.players||[];
   if(!teams.length) return h+'<p class="sub">ESPN aún no tiene estadísticas de jugadores para este partido.</p>';
-  h+=legend+(g.st==='in'?'<p class="sub">En directo: se actualiza cada 30 segundos.</p>':'');
+  h+=legend+(g.st==='in'?'<p class="sub">En directo: se actualiza cada 30 segundos.</p>':'')
+    +(BOX.backup?'<p class="sub">ESPN no responde: estadística de la copia guardada en el repo.</p>':'');
   for(const ab of [g.away.t,g.home.t]){
     const tp=teams.find(t=>t.team.abbreviation===ab); if(!tp) continue;
     h+=`<h2 class="tn">${logo(ab)}${tname(ab)}</h2>`+boxTable(tp);
@@ -619,12 +628,14 @@ document.addEventListener('change',e=>{
   if(e.target.id==='calpick'&&e.target.value){calDay=e.target.value;render();}
 });
 
+// lee un JSON del repo; si no se pueden leer los archivos locales (p. ej. abriendo el html con doble clic, file://), lo lee de GitHub
+const RAW='https://raw.githubusercontent.com/adrian876/nba-apuesta-2627/main/';
+const oneJSON=u=>fetch(u,{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
+const repoJSON=async f=>(location.protocol.startsWith('http')&&await oneJSON(f+'?t='+Date.now()))||oneJSON(RAW+f+'?t='+Date.now());
+
 // datos guardados por GitHub Actions en el propio repo
 async function loadRepoData(){
-  // si no se pueden leer los archivos locales (p. ej. abriendo el html con doble clic, file://), se leen del repo en GitHub
-  const RAW='https://raw.githubusercontent.com/adrian876/nba-apuesta-2627/main/';
-  const one=u=>fetch(u,{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
-  const get=async f=>(location.protocol.startsWith('http')&&await one(f+'?t='+Date.now()))||one(RAW+f+'?t='+Date.now());
+  const get=repoJSON;
   if(!names.length){
     const a=await get('data/apuestas.json');
     if(a){PLAYERS=a.players; RESULTS=a.results; names=Object.keys(PLAYERS); selPlayer=names[0];}

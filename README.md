@@ -154,6 +154,15 @@ Al tocar un partido se abre su ficha, con "← Volver a la jornada" para salir.
   - Que la estadística en directo se actualiza durante el partido.
   - Que `byathlete` pasa a dar la temporada 2026-27 cuando haya partidos jugados.
 
+### Copia de seguridad de las estadísticas
+
+- **Qué guarda:** en cada ejecución, el script guarda la estadística de los partidos terminados que aún no tenía, en `data/partidos/<id>.json` (unos 7 KB por partido).
+  - El formato es el mismo que `boxscore.players` de ESPN, pero solo con los campos que usa la web.
+  - Guarda como mucho 60 partidos por ejecución.
+  - Si ESPN aún no tiene la estadística de un partido, se reintenta en la siguiente ejecución.
+- **Cuándo la usa la web:** solo si ESPN falla o no trae jugadores de un partido terminado. En ese caso lo avisa en la ficha.
+- **Toda la temporada** son unos 1.230 partidos × 7 KB, unos 9 MB, y menos comprimido.
+
 ## Tamaño y límites (medido el 18/10/2026)
 
 - **Web publicada:** unos 5 MB, casi todo fotos. El límite de GitHub Pages es 1 GB y cuenta solo los archivos actuales.
