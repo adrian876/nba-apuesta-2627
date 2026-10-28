@@ -80,6 +80,53 @@ La clasificación solo cambia cuando **termina** un partido. No es en directo ju
   - El cartel de la cena dice que vais todos empatados.
 - **Partidos en las páginas de equipo:** en "Últimos partidos" los de pretemporada llevan la etiqueta "pret.".
 
+## Minijuego (🏀 del título)
+
+**Acceso:** solo se llega tocando el 🏀 del título. `index.html` descarga `juego.js` la primera vez (con `?v=N` para saltarse la caché: súbelo al cambiar el juego).
+
+**Reglas**
+- Eliges quién eres (de los 4).
+- Mantén pulsado y la flecha gira entre 20° y 82° (`ANG_MIN`, `ANG_MAX`, `SWEEP`). Al soltar, tiro en parábola.
+- 30 s (`TIME`), más 1 s por canasta (`BONUS`).
+- Canasta: 3 puntos, +1 por cada canasta seguida. Tapón: −1 y corta la racha.
+- El defensor (Wemby) salta sin parar. El salto completo dura 2 s (`P0`) y cada canasta lo acorta 0,1 s (`PSTEP`), hasta 0,6 s (`PMIN`).
+
+**Física** (mundo lógico de 400×600, en `juego.js`)
+- **Tiro:** velocidad 920 y gravedad 1400.
+- **Aro y tablero:** el aro son dos puntos de choque a ±21 (`HOOP.half`); el tablero, un segmento vertical.
+- **Canasta:** cuenta al cruzar la línea del aro hacia abajo entre los dos puntos.
+- **Dificultad:** se ajustó simulando miles de tiros. Hay dos ventanas para encestar: una parábola tensa (62-67°), que el defensor tapa fácilmente, y otra bombeada (70-74°). Para hacerlo más difícil, lo que más influye es bajar `SWEEP`, que hace girar la flecha más rápido. Reducir el aro influye poco, porque muchas canastas entran rebotando.
+- **Relanzamiento:** el balón vuelve en cuanto se sabe el resultado: 0,2 s tras canasta, 0,15 s tras fallo y 0,3 s tras tapón.
+
+**Navegación:** el botón Atrás del móvil o la ✕ cierran el juego, que tiene su propia entrada en el historial.
+
+**Récords compartidos:** en **Firebase Realtime Database** (`FIREBASE_URL` en `juego.js`), proyecto `app-nba-bf985`, de la cuenta de Google de Adrian.
+- **Formato:** `records/<Nombre>` = `{score, at}`, el mejor resultado de cada uno.
+- **Escritura:** cada jugador escribe solo su propio récord y solo si lo mejora. Así dos personas no se pisan.
+- **Acceso:** por REST, sin librerías: `GET /records.json` y `PUT /records/<Nombre>.json`.
+- **Si Firebase falla:** se usan los récords guardados en el navegador (`localStorage`).
+- **Riesgo aceptado:** la dirección es pública, así que cualquiera podría cambiar una puntuación. Las reglas de la base de datos lo limitan a los 4 nombres, números razonables y solo para subir el récord.
+- **No en GitHub:** necesitaría un token de la cuenta dentro de una web pública, y GitHub lo revocaría.
+- **Reglas de Firebase** (consola de Firebase → Realtime Database → Reglas). El "modo de prueba" caduca a los 30 días; estas reglas lo sustituyen:
+
+```json
+{
+  "rules": {
+    "records": {
+      ".read": true,
+      "$name": {
+        ".write": "newData.exists() && ($name === 'Ghali' || $name === 'Telmo' || $name === 'Manu' || $name === 'Adrian')",
+        ".validate": "newData.hasChildren(['score', 'at']) && newData.child('score').isNumber() && newData.child('score').val() >= -100 && newData.child('score').val() <= 5000 && newData.child('at').isString() && (!data.exists() || newData.child('score').val() > data.child('score').val())",
+        "$other": { ".validate": "$other === 'score' || $other === 'at'" }
+      }
+    }
+  }
+}
+```
+
+- **Borrar o bajar un récord:** solo desde la consola de Firebase (Realtime Database → Datos), con la cuenta de Google del proyecto. Las reglas (`newData.exists()` y "solo si mejora") impiden borrar o bajar récords desde la web o con `curl`.
+- **Estado inicial (28/10/2026):** los 4 con 0 puntos, salvo Manu, que ya tenía 33 de una partida de prueba.
+
 ## Cómo modificar cosas
 
 - **Apuestas:** `players` en `data/apuestas.json`. Los equipos van por abreviatura de ESPN (`NY`, `SA`, `GS`, `NO`, `UTAH`, `LAL`...) en orden de posición 1 a 15. Los premios usan un id (`wembanyama`, `doncic`...).

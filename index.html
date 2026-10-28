@@ -18,6 +18,8 @@ body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-ap
 .wrap{max-width:1100px;margin:0 auto;padding-block:20px 60px}
 header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:16px}
 h1{font-size:22px;margin:0}
+#ballbtn{cursor:pointer;display:inline-block;-webkit-tap-highlight-color:transparent}
+#ballbtn:active{transform:scale(1.25) rotate(40deg)}
 h2{font-size:16px;margin:28px 0 10px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
 .status{font-size:12px;color:var(--mute)}
 .status.err{color:var(--warn)}
@@ -259,7 +261,7 @@ h2.tn img{width:28px;height:28px;object-fit:contain}
 <div class="wall"><i style="background-image:url(img/bg/wemby2.jpg)"></i><i style="background-image:url(img/bg/jokic.jpg)"></i><i style="background-image:url(img/bg/doncic.jpg)"></i><i style="background-image:url(img/bg/lebron2.jpg)"></i><i style="background-image:url(img/bg/giannis.jpg)"></i></div>
 <div class="wrap">
 <header>
-  <h1>🏀 Apuesta NBA 2026/27</h1>
+  <h1><span id="ballbtn" role="button" aria-label="Minijuego">🏀</span> Apuesta NBA 2026/27</h1>
   <div id="status" class="status">Cargando…</div>
 </header>
 <nav id="tabs"></nav>
@@ -1063,6 +1065,12 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',e=>{
   if(e.target.id==='calpick'&&e.target.value){calDay=e.target.value;render();replaceNav();}
   if(e.target.id==='newsteam'){newsTeam=e.target.value;render();}
+});
+
+// minijuego: solo se llega tocando el balón del título; juego.js se descarga la primera vez
+document.getElementById('ballbtn').addEventListener('click',()=>{
+  if(window.Juego) return window.Juego.open();
+  const sc=document.createElement('script'); sc.src='juego.js?v=2'; sc.onload=()=>window.Juego.open(); document.head.appendChild(sc);
 });
 
 // lee un JSON del repo; si no se pueden leer los archivos locales (p. ej. abriendo el html con doble clic, file://), lo lee de GitHub
