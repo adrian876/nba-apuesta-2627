@@ -122,7 +122,7 @@ const PLAYER_STATS = `https://site.web.api.espn.com/apis/common/v3/sports/basket
 async function rosters(standings) {
   const old = await readJSON('data/plantillas.json', null);
   const hasLeaders = await readJSON('data/lideres.json', null);
-  if (old && hasLeaders && Date.now() - new Date(old.updated).getTime() < FULL_EVERY_MS) return;
+  if (!process.env.FORCE_FULL && old && hasLeaders && Date.now() - new Date(old.updated).getTime() < FULL_EVERY_MS) return;
 
   const ps = await get(PLAYER_STATS);
   const idx = {};
@@ -137,6 +137,7 @@ async function rosters(standings) {
       blk: r1(val(a, 'avgBlocks')), to: r1(val(a, 'avgTurnovers')),
       fgm: r1(val(a, 'avgFieldGoalsMade')), fga: r1(val(a, 'avgFieldGoalsAttempted')), fgp: r1(val(a, 'fieldGoalPct')),
       tpm: r1(val(a, 'avgThreePointFieldGoalsMade')), tpa: r1(val(a, 'avgThreePointFieldGoalsAttempted')), tpp: r1(val(a, 'threePointFieldGoalPct')),
+      ftm: r1(val(a, 'avgFreeThrowsMade')), fta: r1(val(a, 'avgFreeThrowsAttempted')), ftp: r1(val(a, 'freeThrowPct')),
     };
   }
 
@@ -161,10 +162,21 @@ async function rosters(standings) {
 // Líderes de la temporada (top 10) de jugadores y equipos.
 // Eficiencia (EFF de la NBA) = PTS + REB + AST + ROB + TAP - tiros fallados - libres fallados - pérdidas, por partido.
 const TEAM_STATS = `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/statistics/byteam?season=2027&seasontype=2&limit=50`;
-const LEADER_CATS = [
-  ['pts', 'Puntos totales'], ['ppg', 'Puntos por partido'], ['apg', 'Asistencias por partido'],
-  ['rpg', 'Rebotes por partido'], ['eff', 'Eficiencia por partido'], ['spg', 'Robos por partido'],
-];
+// [clave, título, menos es mejor, unidad]
+const LEADER_CATS = {
+  players: [
+    ['pts', 'Puntos totales'], ['ppg', 'Puntos por partido'], ['apg', 'Asistencias por partido'],
+    ['rpg', 'Rebotes por partido'], ['tpm', 'Triples metidos (total)'], ['eff', 'Eficiencia por partido'],
+    ['ts', '% de tiro real (TS%)', false, '%'], ['spg', 'Robos por partido'],
+  ],
+  teams: [
+    ['pts', 'Puntos totales'], ['ppg', 'Puntos por partido'], ['opp', 'Puntos en contra por partido (menos = mejor)', true],
+    ['apg', 'Asistencias por partido'], ['rpg', 'Rebotes por partido'], ['tpm', 'Triples metidos (total)'],
+    ['eff', 'Eficiencia por partido'], ['ts', '% de tiro real (TS%)', false, '%'], ['spg', 'Robos por partido'],
+  ],
+};
+// % de tiro real: puntos / (2 × (tiros de campo + 0,44 × tiros libres))
+const tsPct = (pts, fga, fta) => (fga + fta) > 0 ? 100 * pts / (2 * (fga + 0.44 * fta)) : 0;
 const r1 = v => Math.round(v * 10) / 10;
 const eff = x => x.ppg + x.rpg + x.apg + x.spg + x.bpg - (x.fga - x.fgm) - (x.fta - x.ftm) - x.tov;
 
@@ -176,23 +188,28 @@ async function leaders(ps, val, season) {
       pts: val(a, 'points'), ppg: val(a, 'avgPoints'), apg: val(a, 'avgAssists'), rpg: val(a, 'avgRebounds'),
       spg: val(a, 'avgSteals'), bpg: val(a, 'avgBlocks'), tov: val(a, 'avgTurnovers'),
       fgm: val(a, 'avgFieldGoalsMade'), fga: val(a, 'avgFieldGoalsAttempted'), ftm: val(a, 'avgFreeThrowsMade'), fta: val(a, 'avgFreeThrowsAttempted'),
+      tpm: val(a, 'threePointFieldGoalsMade'),
     };
     x.eff = eff(x);
+    x.ts = tsPct(x.ppg, x.fga, x.fta);
     return x;
   });
   const maxGp = Math.max(1, ...pl.map(x => x.gp));
   const minGp = Math.max(1, Math.ceil(maxGp * 0.7));
   const players = {};
-  for (const [k] of LEADER_CATS) {
-    const pool = k === 'pts' ? pl : pl.filter(x => x.gp >= minGp);
-    players[k] = pool.sort((a, b) => b[k] - a[k]).slice(0, 10).map(x => ({ id: x.id, n: x.n, t: x.t, gp: x.gp, v: k === 'pts' ? x.pts : r1(x[k]) }));
+  for (const [k, , asc] of LEADER_CATS.players) {
+    // totales sin mínimo; medias con mínimo de partidos; TS% además con al menos 8 tiros de campo por partido
+    const pool = k === 'pts' || k === 'tpm' ? pl : pl.filter(x => x.gp >= minGp && (k !== 'ts' || x.fga >= 8));
+    players[k] = pool.sort((a, b) => asc ? a[k] - b[k] : b[k] - a[k]).slice(0, 10)
+      .map(x => ({ id: x.id, n: x.n, t: x.t, gp: x.gp, v: k === 'pts' || k === 'tpm' ? x[k] : r1(x[k]) }));
   }
 
   // equipos
   const ts = await get(TEAM_STATS);
   const tidx = {};
   ts.categories.forEach(c => (c.names || []).forEach((n, i) => tidx[c.name + ':' + n] ??= i));
-  const tval = (t, cat, n) => { const c = t.categories.find(x => x.name === cat && x.splitId === '0'); const i = tidx[cat + ':' + n]; return c && i != null ? +c.values[i] : 0; };
+  // splitId '0' = estadística propia, '900' = la del rival
+  const tval = (t, cat, n, split = '0') => { const c = t.categories.find(x => x.name === cat && x.splitId === split); const i = tidx[cat + ':' + n]; return c && i != null ? +c.values[i] : 0; };
   const tl = ts.teams.map(t => {
     const x = {
       t: t.team.abbreviation, gp: tval(t, 'general', 'gamesPlayed'),
@@ -200,15 +217,18 @@ async function leaders(ps, val, season) {
       rpg: tval(t, 'general', 'avgRebounds'), spg: tval(t, 'defensive', 'avgSteals'), bpg: tval(t, 'defensive', 'avgBlocks'),
       tov: tval(t, 'offensive', 'avgTurnovers'), fgm: tval(t, 'offensive', 'avgFieldGoalsMade'), fga: tval(t, 'offensive', 'avgFieldGoalsAttempted'),
       ftm: tval(t, 'offensive', 'avgFreeThrowsMade'), fta: tval(t, 'offensive', 'avgFreeThrowsAttempted'),
+      tpm: tval(t, 'offensive', 'threePointFieldGoalsMade'), opp: tval(t, 'offensive', 'avgPoints', '900'),
     };
     x.eff = eff(x);
+    x.ts = tsPct(x.ppg, x.fga, x.fta);
     return x;
   });
   const teams = {};
-  for (const [k] of LEADER_CATS) teams[k] = tl.sort((a, b) => b[k] - a[k]).slice(0, 10).map(x => ({ t: x.t, gp: x.gp, v: k === 'pts' ? x.pts : r1(x[k]) }));
+  for (const [k, , asc] of LEADER_CATS.teams)
+    teams[k] = tl.sort((a, b) => asc ? a[k] - b[k] : b[k] - a[k]).slice(0, 10).map(x => ({ t: x.t, gp: x.gp, v: k === 'pts' || k === 'tpm' ? x[k] : r1(x[k]) }));
 
   await writeJSON('data/lideres.json', { updated: new Date().toISOString(), season, minGp, cats: LEADER_CATS, players, teams }, 0);
-  console.log('líderes de', season, '· mínimo', minGp, 'partidos · máx. anotador:', players.ppg[0] && players.ppg[0].n, players.ppg[0] && players.ppg[0].v);
+  console.log('líderes de', season, '· mínimo', minGp, 'partidos · máx. anotador:', players.ppg[0] && players.ppg[0].n, players.ppg[0] && players.ppg[0].v, '· menos encajados:', teams.opp[0] && teams.opp[0].t, teams.opp[0] && teams.opp[0].v);
 }
 
 // Copia de seguridad de la estadística de cada partido terminado: data/partidos/<id>.json.

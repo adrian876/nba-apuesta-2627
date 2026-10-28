@@ -194,6 +194,21 @@ details.inj p{margin:8px 0 0;font-size:13px;line-height:1.45}
 .ameta.by{color:var(--accent);font-weight:600}
 .ameta.by .av{width:22px;height:22px}
 .box td.l img{width:16px;height:16px;object-fit:contain;vertical-align:-3px}
+.hm{}
+@media (max-width:600px){.hm{display:none}.pn{display:none}.comp-t td,.comp-t th{padding:6px 3px}.comp-t .cell{min-width:38px;padding:2px 3px}}
+.lg1{width:40px;padding-left:4px!important;padding-right:4px!important}
+.lg1 img[data-team]{width:28px;height:28px;object-fit:contain;display:block;margin:0 auto}
+.cupgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.cupg{padding:12px 14px}
+.cupg h3{margin:0 0 6px;font-size:15px}
+.cupg table td,.cupg table th{padding:5px 6px}
+.cupg .lg1{width:auto;text-align:left}
+.cupg .lg1>*{display:inline-block!important;vertical-align:middle;margin:0 3px 0 0!important}
+.cupg tr.q td{background:rgba(34,197,94,.08)}
+.cupg tr.wq td{background:rgba(245,158,11,.10)}
+.cupg details{margin-top:6px}
+.cupg summary{cursor:pointer;font-size:13px;color:var(--mute)}
+.bh{width:32px;height:32px;border-radius:50%;object-fit:cover;object-position:50% 15%;background:var(--card2);vertical-align:middle;margin-right:4px}
 .calbar select{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:7px 12px;font:inherit;max-width:100%}
 .news{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
 a.art{display:flex;flex-direction:column;padding:0;overflow:hidden;color:inherit;text-decoration:none}
@@ -287,7 +302,7 @@ let ORDER = {E:[],W:[]};
 let PRESEASON = false;
 let REG = { start:'2026-10-20T07:00:00Z', end:'2027-04-12T06:59:00Z' };
 const GAMES = 82;
-const BET_START = '2026-10-18';   // primer día del historial: el eje X del gráfico va de aquí a hoy
+const BET_START = '2026-10-20';   // reserva: el gráfico empieza el primer día del historial con puntos de liga regular (sin 'pre')
 let tab = 'general', selPlayer = null;
 let names = [];
 
@@ -404,10 +419,12 @@ function chart(){
   const today=dayIn(TZ), live={d:today,pts:Object.fromEntries(score().map(s=>[s.name,s.total]))};
   const i=days.findIndex(x=>x.d===today); if(i>=0) days[i]=live; else days.push(live);
   days.sort((a,b)=>a.d.localeCompare(b.d));
-  for(let k=days.length-1;k>=0;k--) if(days[k].d<BET_START||days[k].d>today) days.splice(k,1);
+  const start=((HIST&&HIST.days||[]).find(x=>!x.pre)||{}).d||BET_START;
+  for(let k=days.length-1;k>=0;k--) if(days[k].d<start||days[k].d>today) days.splice(k,1);
+  if(!days.length) days.push(live);
 
-  const W=Math.max(340,Math.min(1068,(window.innerWidth||800)-34)), H=320, L=38, R=120, T=24, B=30;
-  const first=BET_START, idx=d=>Math.round((new Date(d)-new Date(first))/864e5);
+  const W=Math.max(340,Math.min(1068,(window.innerWidth||800)-34)), H=320, L=38, R=148, T=24, B=30;
+  const first=days[0].d, idx=d=>Math.round((new Date(d)-new Date(first))/864e5);
   const span=idx(today);
   const vals=days.flatMap(x=>names.map(n=>x.pts[n]).filter(v=>v!=null));
   let lo=Math.min(...vals), hi=Math.max(...vals);
@@ -554,6 +571,7 @@ async function loadBox(g){
   if(tab==='cal'&&openGame===g.id) render();
 }
 
+const headImg=id=>`<img class="bh" src="https://a.espncdn.com/i/headshots/nba/players/full/${id}.png" alt="" loading="lazy" data-player="${id}" onerror="this.style.visibility='hidden'">`;
 const pct=(m,a)=>a>0?(100*m/a).toFixed(1).replace('.0',''):'–';
 const shortName=n=>{const p=n.split(' '); return p.length>1?p[0][0]+'. '+p.slice(1).join(' '):n;};
 const pm=v=>{const n=+v; return isNaN(n)?v:`<span class="${n>0?'W':n<0?'L':''}">${n>0?'+'+n:n}</span>`;};
@@ -564,16 +582,17 @@ function boxTable(tp){
   const v=(arr,k)=>arr[L[k]]??'';
   const split=x=>{const [m,a]=(x||'0-0').split('-').map(Number); return [m,a];};
   const cells=arr=>{const [fm,fa]=split(v(arr,'FG')), [tm,ta]=split(v(arr,'3PT'));
-    return `<td>${v(arr,'MIN')}</td><td class="b">${v(arr,'PTS')}</td><td>${v(arr,'REB')}</td><td>${v(arr,'AST')}</td><td>${v(arr,'STL')}</td><td>${v(arr,'TO')}</td>
-      <td>${v(arr,'FG')}</td><td>${pct(fm,fa)}</td><td>${v(arr,'3PT')}</td><td>${pct(tm,ta)}</td><td>${pm(v(arr,'+/-'))}</td>`;};
+    const [lm,la]=split(v(arr,'FT'));
+    return `<td>${v(arr,'MIN')}</td><td class="b">${v(arr,'PTS')}</td><td>${v(arr,'REB')}</td><td>${v(arr,'AST')}</td><td>${v(arr,'STL')}</td><td>${v(arr,'BLK')}</td><td>${v(arr,'TO')}</td>
+      <td>${v(arr,'FG')}</td><td>${pct(fm,fa)}</td><td>${v(arr,'3PT')}</td><td>${pct(tm,ta)}</td><td>${v(arr,'FT')}</td><td>${pct(lm,la)}</td><td>${pm(v(arr,'+/-'))}</td>`;};
   const played=st.athletes.filter(a=>!a.didNotPlay&&a.stats&&a.stats.length), dnp=st.athletes.filter(a=>a.didNotPlay||!a.stats||!a.stats.length);
-  let h=`<div class="tablebox box"><table><tr><th class="l">Jugador</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>ROB</th><th>PÉR</th><th>TC</th><th>%TC</th><th>T3</th><th>%T3</th><th>+/-</th></tr>`;
+  let h=`<div class="tablebox box"><table><tr><th class="l">Jugador</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>ROB</th><th>TAP</th><th>PÉR</th><th>TC</th><th>%TC</th><th>T3</th><th>%T3</th><th>TL</th><th>%TL</th><th>+/-</th></tr>`;
   played.forEach((a,i)=>{
-    if(i&&a.starter!==played[i-1].starter) h+='<tr class="sep"><td class="l" colspan="12">Banquillo</td></tr>';
-    h+=`<tr><td class="l"><span class="jn">${a.athlete.jersey||''}</span><span ${a.athlete.id?`data-player="${a.athlete.id}" class="pl"`:''}>${a.athlete.shortName||shortName(a.athlete.displayName)}</span>${a.starter?' <small class="st">T</small>':''}</td>${cells(a.stats)}</tr>`;
+    if(i&&a.starter!==played[i-1].starter) h+='<tr class="sep"><td class="l" colspan="15">Banquillo</td></tr>';
+    h+=`<tr><td class="l">${a.athlete.id?headImg(a.athlete.id):''}<span class="jn">${a.athlete.jersey||''}</span><span ${a.athlete.id?`data-player="${a.athlete.id}" class="pl"`:''}>${a.athlete.shortName||shortName(a.athlete.displayName)}</span>${a.starter?' <small class="st">T</small>':''}</td>${cells(a.stats)}</tr>`;
   });
   if(st.totals&&st.totals.length) h+=`<tr class="tot"><td class="l">Total</td>${cells(st.totals).replace(/<td>[^<]*<\/td>/,'<td></td>')}</tr>`;
-  if(dnp.length) h+=`<tr class="dnp"><td class="l" colspan="12">No jugaron: ${dnp.map(a=>a.athlete.shortName||a.athlete.displayName).join(', ')}</td></tr>`;
+  if(dnp.length) h+=`<tr class="dnp"><td class="l" colspan="15">No jugaron: ${dnp.map(a=>a.athlete.shortName||a.athlete.displayName).join(', ')}</td></tr>`;
   return h+'</table></div>';
 }
 
@@ -582,14 +601,14 @@ function rosterTable(abbr){
   const list=(PLANT&&PLANT.teams[abbr]||[]).slice().sort((a,b)=>(b.s?b.s.pts:-1)-(a.s?a.s.pts:-1));
   if(!list.length) return '<p class="sub">No hay plantilla guardada para este equipo.</p>';
   const f=x=>x==null?'–':x;
-  let h=`<div class="tablebox box"><table><tr><th class="l">Jugador</th><th>PJ</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>ROB</th><th>PÉR</th><th>TC</th><th>%TC</th><th>T3</th><th>%T3</th></tr>`;
+  let h=`<div class="tablebox box"><table><tr><th class="l">Jugador</th><th>PJ</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>ROB</th><th>TAP</th><th>PÉR</th><th>TC</th><th>%TC</th><th>T3</th><th>%T3</th><th>TL</th><th>%TL</th></tr>`;
   const live=INJ.list?injById():null;
   for(const p of list){
     const li=live?live[p.id]:null, pinj=live?(li?li.status:''):p.inj;
     const s=p.s, inj=pinj?` <small class="inj" title="${pinj}">${/out/i.test(pinj)?'baja':'duda'}</small>`:'';
-    h+=`<tr><td class="l"><span class="jn">${p.j}</span><span data-player="${p.id}" class="pl">${shortName(p.n)}</span>${inj}</td>`+(s?
-      `<td>${s.gp}</td><td>${s.min}</td><td class="b">${s.pts}</td><td>${s.reb}</td><td>${s.ast}</td><td>${s.stl}</td><td>${s.to}</td><td>${s.fgm}-${s.fga}</td><td>${f(s.fgp)}</td><td>${s.tpm}-${s.tpa}</td><td>${f(s.tpp)}</td>`
-      :'<td colspan="11" class="sub" style="text-align:left">Sin partidos la temporada pasada</td>')+'</tr>';
+    h+=`<tr><td class="l">${headImg(p.id)}<span class="jn">${p.j}</span><span data-player="${p.id}" class="pl">${shortName(p.n)}</span>${inj}</td>`+(s?
+      `<td>${s.gp}</td><td>${s.min}</td><td class="b">${s.pts}</td><td>${s.reb}</td><td>${s.ast}</td><td>${s.stl}</td><td>${f(s.blk)}</td><td>${s.to}</td><td>${s.fgm}-${s.fga}</td><td>${f(s.fgp)}</td><td>${s.tpm}-${s.tpa}</td><td>${f(s.tpp)}</td><td>${s.ftm!=null?s.ftm+'-'+s.fta:'–'}</td><td>${f(s.ftp)}</td>`
+      :'<td colspan="14" class="sub" style="text-align:left">Sin partidos esta temporada</td>')+'</tr>';
   }
   return h+'</table></div>';
 }
@@ -612,7 +631,7 @@ function viewGame(g){
     ${side(g.away,f.away,done&&g.away.s>g.home.s)}${side(g.home,f.home,done&&g.home.s>g.away.s)}</div>`;
   h+=PRESEASON?'<p class="sub">Quién quiere que gane cada equipo aparecerá desde el 20/10: se calcula con la clasificación de liga regular, y la de pretemporada no cuenta.</p>'
     :`<details class="card whys"><summary>¿Por qué? (dónde apostó cada uno y dónde va)</summary>${names.map(n=>whyLine(n,g)).join('')}</details>`;
-  const legend='<p class="sub">TC: tiros de campo (metidos-intentados) · T3: triples · ROB: robos · PÉR: pérdidas · T: titular</p>';
+  const legend='<p class="sub">TC: tiros de campo (metidos-intentados) · T3: triples · TL: tiros libres · ROB: robos · TAP: tapones · PÉR: pérdidas · T: titular</p>';
   if(g.st!=='post'&&INJ.list){
     const ppg=ppgMap();
     for(const s of [g.away,g.home]){
@@ -674,11 +693,11 @@ function betsTable(){
 }
 
 function viewConf(c, title){
-  let h=`<h2>${title}</h2><div class="tablebox"><table><tr><th>#</th><th class="l">Equipo</th><th>PJ</th><th>G</th><th>P</th><th>Racha</th><th>Últ. 10</th>`+names.map(n=>`<th>${person(n)}${n}</th>`).join('')+'</tr>';
+  let h=`<h2>${title}</h2><div class="tablebox"><table class="comp-t"><tr><th>#</th><th></th><th>PJ</th><th>G</th><th>P</th><th class="hm">Racha</th><th class="hm">Últ. 10</th>`+names.map(n=>`<th>${person(n)}<span class="pn">${n}</span></th>`).join('')+'</tr>';
   const pos={}; names.forEach(n=>PLAYERS[n][c].forEach((a,i)=>{(pos[a]=pos[a]||{})[n]=i+1;}));
   for(const t of ORDER[c]){
-    h+=`<tr><td><b>${PRESEASON?'-':t.pos}</b></td><td class="l"><div class="team">${logo(t.abbr)}<span>${t.name}</span></div></td>
-      ${PRESEASON?'<td>0</td><td>0</td><td>0</td><td>-</td><td>-</td>':`<td>${t.gp}</td><td>${t.w}</td><td>${t.l}</td><td class="${t.streak[0]==='W'?'W':'L'}">${t.streak}</td><td>${t.l10}</td>`}`;
+    h+=`<tr><td><b>${PRESEASON?'-':t.pos}</b></td><td class="lg1">${logo(t.abbr)}</td>
+      ${PRESEASON?'<td>0</td><td>0</td><td>0</td><td class="hm">-</td><td class="hm">-</td>':`<td>${t.gp}</td><td>${t.w}</td><td>${t.l}</td><td class="hm ${t.streak[0]==='W'?'W':'L'}">${t.streak}</td><td class="hm">${t.l10}</td>`}`;
     for(const n of names){
       const bet=pos[t.abbr][n], d=PRESEASON?0:Math.abs(bet-t.pos);
       h+=`<td><span class="cell" style="${dcolor(d)}"><b>${bet}º</b><small>${d} pt${d===1?'':'s'}</small></span></td>`;
@@ -687,9 +706,61 @@ function viewConf(c, title){
   }
   return h+'</table></div>';
 }
+let compMode='season';
 function viewComp(){
-  return '<p class="sub">Cada celda: posición que apostó cada uno y los puntos que le suma ese equipo ahora mismo (menos = mejor).</p>'
+  const h=`<div class="calbar"><button class="pill ${compMode==='season'?'on':''}" data-cm="season">Temporada</button><button class="pill ${compMode==='cup'?'on':''}" data-cm="cup">🏆 Copa NBA</button></div>`;
+  if(compMode==='cup') return h+viewCup();
+  return h+'<p class="sub">Cada celda: posición que apostó cada uno y los puntos que le suma ese equipo ahora mismo (menos = mejor). Toca un escudo para ver el equipo.</p>'
     +viewConf('E','Conferencia Este')+viewConf('W','Conferencia Oeste');
+}
+
+/* ---------- Copa NBA: grupos deducidos del calendario ---------- */
+// ESPN marca los partidos de grupos con la nota "NBA Cup - Group Play" pero no dice el grupo:
+// cada equipo juega contra los otros 4 de su grupo, así que los grupos son los componentes conexos de esos cruces.
+function cupGroups(){
+  const games=CAL.games.filter(g=>/NBA Cup - Group/i.test(g.note||''));
+  const adj={}; for(const g of games){ (adj[g.home.t]=adj[g.home.t]||new Set()).add(g.away.t); (adj[g.away.t]=adj[g.away.t]||new Set()).add(g.home.t); }
+  const seen=new Set(), groups=[];
+  for(const t of Object.keys(adj).sort()){
+    if(seen.has(t)) continue;
+    const comp=[], st=[t]; seen.add(t);
+    while(st.length){ const x=st.pop(); comp.push(x); for(const y of adj[x]) if(!seen.has(y)){ seen.add(y); st.push(y); } }
+    groups.push(comp);
+  }
+  // clasificación de cada grupo: victorias, enfrentamiento directo (empate a dos), diferencia de puntos, puntos a favor
+  const rows=groups.map(teams=>{
+    const r=Object.fromEntries(teams.map(t=>[t,{t,w:0,l:0,pf:0,pa:0,h2h:{}}]));
+    const gg=games.filter(g=>r[g.home.t]&&r[g.away.t]);
+    for(const g of gg) if(g.st==='post'){
+      const H=r[g.home.t], A=r[g.away.t], hw=g.home.s>g.away.s;
+      H.pf+=g.home.s; H.pa+=g.away.s; A.pf+=g.away.s; A.pa+=g.home.s;
+      (hw?H:A).w++; (hw?A:H).l++; (hw?H:A).h2h[(hw?A:H).t]=1;
+    }
+    const list=Object.values(r).sort((a,b)=>b.w-a.w||a.l-b.l||(a.h2h[b.t]?-1:b.h2h[a.t]?1:0)||(b.pf-b.pa)-(a.pf-a.pa)||b.pf-a.pf);
+    const conf=TEAMS[teams[0]]?TEAMS[teams[0]].conf:'E';
+    return {conf,list,games:gg.sort((a,b)=>a.d.localeCompare(b.d))};
+  });
+  // numerar por conferencia (ESPN no da el nombre oficial A/B/C) y marcar comodín: mejor segundo de cada conferencia
+  for(const c of ['E','W']){
+    const gs=rows.filter(g=>g.conf===c); gs.forEach((g,i)=>g.name=(c==='E'?'Este':'Oeste')+' · Grupo '+(i+1));
+    const seconds=gs.map(g=>g.list[1]).filter(Boolean).sort((a,b)=>b.w-a.w||a.l-b.l||(b.pf-b.pa)-(a.pf-a.pa)||b.pf-a.pf);
+    if(seconds[0]&&seconds[0].w+seconds[0].l>0) seconds[0].wild=true;
+  }
+  return {rows,ko:CAL.games.filter(g=>/NBA Cup/i.test(g.note||'')&&!/Group/i.test(g.note))};
+}
+function viewCup(){
+  if(!CAL) return '<p class="sub">Cargando calendario…</p>';
+  const {rows,ko}=cupGroups();
+  if(!rows.length) return '<p class="sub">No hay partidos de la Copa NBA en el calendario.</p>';
+  const cupFans=t=>names.filter(n=>PLAYERS[n].cup===t);
+  let h=`<p class="sub">Fase de grupos: pasan a cuartos el 1º de cada grupo y el mejor 2º de cada conferencia (comodín). Orden: victorias, enfrentamiento directo, diferencia de puntos y puntos a favor. ESPN no da el nombre oficial de cada grupo, así que van numerados. Las caras indican quién apostó por ese equipo para ganar la copa.</p>`;
+  if(ko.length) h+=`<h2>Eliminatorias</h2><div class="card glist">${ko.map(g=>{const t=g.home.t;return gameRow(g,t).replace('<span class="gw">',`<span class="gw">${esc(g.note.replace('NBA Cup - ',''))} · `);}).join('')}</div>`;
+  h+='<div class="cupgrid">'+['E','W'].flatMap(c=>rows.filter(g=>g.conf===c)).map(g=>`<div class="card cupg"><h3>${g.name}</h3>
+    <table><tr><th>#</th><th></th><th>G-P</th><th>Dif.</th><th>PF</th></tr>${g.list.map((x,i)=>`<tr class="${i===0&&x.w+x.l>0?'q':''}${x.wild?' wq':''}">
+      <td>${i+1}</td><td class="lg1">${logo(x.t)}${fanImgs(cupFans(x.t))}${i===0&&x.w+x.l>0?'<small class="tag win">1º</small>':''}${x.wild?'<small class="tag fin">comodín</small>':''}</td>
+      <td><b>${x.w}-${x.l}</b></td><td>${x.w+x.l?(x.pf-x.pa>0?'+':'')+(x.pf-x.pa):'–'}</td><td>${x.pf||'–'}</td></tr>`).join('')}</table>
+    <details><summary>Partidos del grupo</summary>${g.games.map(x=>`<button class="gr" data-game="${x.id}" data-gday="${dayIn(US,new Date(x.d))}"><span class="gw">${new Date(x.d).toLocaleDateString('es-ES',{timeZone:TZ,day:'numeric',month:'short'})}</span><span class="go">${logo(x.away.t)}${x.away.t} @ ${logo(x.home.t)}${x.home.t}</span><span class="gsc">${x.st==='post'?x.away.s+'-'+x.home.s:''}</span></button>`).join('')}</details></div>`).join('')+'</div>';
+  return h;
 }
 
 function viewPlayer(){
@@ -699,10 +770,10 @@ function viewPlayer(){
     <div class="split"><span>Posiciones: <b>${me.base}</b></span><span>Bonus: <b>${me.bonus}</b></span><span>Puesto: <b>${sc.indexOf(me)+1}º</b></span></div></div>`;
   h+='<div class="bets">';
   for(const [c,title] of [['E','Este'],['W','Oeste']]){
-    h+=`<div><h3>${title}</h3><div class="tablebox"><table><tr><th>Apuesta</th><th class="l">Equipo</th><th>Real</th><th>Pts</th><th>Récord</th></tr>`;
+    h+=`<div><h3>${title}</h3><div class="tablebox"><table><tr><th>Apuesta</th><th></th><th>Real</th><th>Pts</th><th>Récord</th></tr>`;
     for(const r of me.rows.filter(r=>r.conf===c)){
       const t=TEAMS[r.abbr];
-      h+=`<tr><td>${r.bet}º</td><td class="l"><div class="team">${logo(r.abbr)}<span>${tname(r.abbr)}</span></div></td><td>${PRESEASON?'-':(r.real??'-')+'º'}</td>
+      h+=`<tr><td>${r.bet}º</td><td class="lg1">${logo(r.abbr)}</td><td>${PRESEASON?'-':(r.real??'-')+'º'}</td>
         <td><span class="cell" style="${dcolor(r.d)}"><b>${r.d}</b></span></td><td>${t&&!PRESEASON?t.w+'-'+t.l:'0-0'}</td></tr>`;
     }
     h+='</table></div></div>';
@@ -824,9 +895,19 @@ function newsCards(items){
 }
 
 /* ---------- páginas de equipo y de jugador (se abren al tocar un escudo o una foto) ---------- */
-let PAGE=null, PAGES=[];   // PAGE: {type:'team',t} | {type:'ath',id}; PAGES: historial para "Volver"
+let PAGE=null, PAGES=[];
+// Cada cambio de pantalla se apunta en el historial del navegador; así el botón Atrás del móvil vuelve a la pantalla anterior
+let navReady=false;
+const navState=()=>({tab,page:PAGE,pages:PAGES,openGame,calDay,newsMode,leadMode,compMode,selPlayer});
+function pushNav(){ if(navReady) history.pushState(navState(),''); }
+function replaceNav(){ if(navReady) history.replaceState(navState(),''); }
+window.addEventListener('popstate',e=>{
+  const st=e.state; if(!st) return;
+  ({tab,openGame,calDay,newsMode,leadMode,compMode,selPlayer}=st); PAGE=st.page||null; PAGES=st.pages||[];
+  render(); window.scrollTo(0,0);
+});   // PAGE: {type:'team',t} | {type:'ath',id}; PAGES: historial para "Volver"
 const TNEWS={}, ATH={};
-function openPage(pg){ if(PAGE) PAGES.push(PAGE); PAGE=pg; render(); window.scrollTo(0,0); }
+function openPage(pg){ if(PAGE) PAGES.push(PAGE); PAGE=pg; render(); pushNav(); window.scrollTo(0,0); }
 async function loadTeamNews(t){
   const c=TNEWS[t]; if(c&&(c.loading||Date.now()-c.at<600000)) return;
   TNEWS[t]={at:Date.now(),items:c&&c.items,loading:true};
@@ -877,7 +958,7 @@ function viewTeamPage(t){
       <div><h3>Próximos partidos</h3><div class="card glist">${next.map(g=>gameRow(g,t)).join('')||'<p class="sub">No hay más.</p>'}</div></div></div>`;
   }
   // plantilla
-  h+=`<h2>Plantilla · medias ${PLANT?PLANT.season:''}</h2><p class="sub">TC: tiros de campo · T3: triples · ROB: robos · PÉR: pérdidas. Toca un jugador para ver su ficha.</p>`+rosterTable(t);
+  h+=`<h2>Plantilla · medias ${PLANT?PLANT.season:''}</h2><p class="sub">TC: tiros de campo · T3: triples · TL: tiros libres · ROB: robos · TAP: tapones · PÉR: pérdidas. Toca un jugador para ver su ficha.</p>`+rosterTable(t);
   // lesiones
   h+='<h2>Lesiones</h2>';
   if(!INJ.list) h+='<p class="sub">Cargando lesiones…</p>';
@@ -934,13 +1015,14 @@ function viewLeaders(){
   const cur=LEAD.season==='2026-27';
   const pickers=id=>{const by=pickedBy(id); return [...new Set(by.map(x=>x.n))];};
   let h=`<div class="calbar"><button class="pill ${leadMode==='players'?'on':''}" data-lm="players">Jugadores</button><button class="pill ${leadMode==='teams'?'on':''}" data-lm="teams">Equipos</button></div>
-    <p class="sub">Temporada ${LEAD.season}${cur?'':' (la pasada: la actual todavía no tiene partidos)'}. ${leadMode==='players'?`Para las medias hay que haber jugado al menos ${LEAD.minGp} partidos (70 % del máximo). La cara indica quién lo apostó en premios.`:''} Eficiencia = PTS + REB + AST + ROB + TAP − tiros fallados − libres fallados − pérdidas, por partido.</p><div class="leads">`;
-  for(const [k,title] of LEAD.cats){
-    const rows=(leadMode==='players'?LEAD.players:LEAD.teams)[k]||[];
+    <p class="sub">Temporada ${LEAD.season}${cur?'':' (la pasada: la actual todavía no tiene partidos)'}. ${leadMode==='players'?`Para las medias hay que haber jugado al menos ${LEAD.minGp} partidos (70 % del máximo). La cara indica quién lo apostó en premios.`:''} Eficiencia = PTS + REB + AST + ROB + TAP − tiros fallados − libres fallados − pérdidas, por partido. TS% = puntos / (2 × (tiros de campo + 0,44 × libres))${leadMode==='players'?', con al menos 8 tiros de campo por partido':''}.</p><div class="leads">`;
+  const cats=Array.isArray(LEAD.cats)?LEAD.cats:LEAD.cats[leadMode];
+  for(const [k,title,,unit] of cats){
+    const rows=(leadMode==='players'?LEAD.players:LEAD.teams)[k]||[], u=unit?' '+unit:'';
     h+=`<div class="card lead"><h3>${title}</h3><ol>`+rows.map((x,i)=>leadMode==='players'
       ?`<li class="${i===0?'top':''}"><span class="lr">${i+1}</span><img class="lh" data-player="${x.id}" src="https://a.espncdn.com/i/headshots/nba/players/full/${x.id}.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
-          <span class="ln"><b>${esc(x.n)}</b><small>${x.t?logo(x.t)+x.t:''} · ${x.gp} PJ</small></span>${fanImgs(pickers(x.id))}<span class="lv">${x.v}</span></li>`
-      :`<li class="${i===0?'top':''}"><span class="lr">${i+1}</span><span class="lt">${logo(x.t)}</span><span class="ln"><b>${tname(x.t)}</b><small>${x.gp} PJ</small></span><span class="lv">${x.v}</span></li>`).join('')+'</ol></div>';
+          <span class="ln"><b>${esc(x.n)}</b><small>${x.t?logo(x.t)+x.t:''} · ${x.gp} PJ</small></span>${fanImgs(pickers(x.id))}<span class="lv">${x.v}${u}</span></li>`
+      :`<li class="${i===0?'top':''}"><span class="lr">${i+1}</span><span class="lt">${logo(x.t)}</span><span class="ln"><b>${tname(x.t)}</b><small>${x.gp} PJ</small></span><span class="lv">${x.v}${u}</span></li>`).join('')+'</ol></div>';
   }
   return h+'</div>';
 }
@@ -956,22 +1038,22 @@ document.addEventListener('click',e=>{
   const tm=e.target.closest('[data-team]'), pl=e.target.closest('[data-player]'), pe=e.target.closest('[data-person]');
   if(!(tm||pl||pe)||e.target.closest('select,option')) return;
   e.preventDefault(); e.stopImmediatePropagation();
-  if(pe){ PAGE=null; PAGES=[]; tab='player'; selPlayer=pe.dataset.person; render(); window.scrollTo(0,0); }
+  if(pe){ PAGE=null; PAGES=[]; tab='player'; selPlayer=pe.dataset.person; render(); pushNav(); window.scrollTo(0,0); }
   else if(pl) openPage({type:'ath',id:pl.dataset.player});
   else if(TEAMS[tm.dataset.team]) openPage({type:'team',t:tm.dataset.team});
 },true);
 document.addEventListener('click',e=>{
-  if(e.target.closest('[data-pback]')){ PAGE=PAGES.pop()||null; render(); return; }
+  if(e.target.closest('[data-pback]')||e.target.closest('[data-back]')){ history.back(); return; }
   const gd=e.target.closest('[data-gday]');
-  if(gd){ PAGE=null; PAGES=[]; tab='cal'; calDay=gd.dataset.gday; openGame=gd.dataset.game; render(); window.scrollTo(0,0); return; }
+  if(gd){ PAGE=null; PAGES=[]; tab='cal'; calDay=gd.dataset.gday; openGame=gd.dataset.game; render(); pushNav(); window.scrollTo(0,0); return; }
   const t=e.target.closest('[data-t]'), p=e.target.closest('[data-p]'), c=e.target.closest('[data-cal]'), gm=e.target.closest('[data-game]'), bk=e.target.closest('[data-back]');
-  if(t){tab=t.dataset.t;openGame=null;PAGE=null;PAGES=[];render();}
-  else if(gm){openGame=gm.dataset.game;render();window.scrollTo(0,0);}
-  else if(bk){openGame=null;render();}
-  else if(e.target.closest('[data-lm]')){leadMode=e.target.closest('[data-lm]').dataset.lm;render();}
-  else if(e.target.closest('[data-nm]')){newsMode=e.target.closest('[data-nm]').dataset.nm;render();}
-  else if(p){selPlayer=p.dataset.p;render();}
-  else if(c){const n=+c.dataset.cal; calDay=n?addDays(calDay,n):dayIn(US); openGame=null; render();}
+  if(t){tab=t.dataset.t;openGame=null;PAGE=null;PAGES=[];render();pushNav();}
+  else if(gm){openGame=gm.dataset.game;render();pushNav();window.scrollTo(0,0);}
+  else if(e.target.closest('[data-lm]')){leadMode=e.target.closest('[data-lm]').dataset.lm;render();replaceNav();}
+  else if(e.target.closest('[data-cm]')){compMode=e.target.closest('[data-cm]').dataset.cm;render();replaceNav();}
+  else if(e.target.closest('[data-nm]')){newsMode=e.target.closest('[data-nm]').dataset.nm;render();replaceNav();}
+  else if(p){selPlayer=p.dataset.p;render();replaceNav();}
+  else if(c){const n=+c.dataset.cal; calDay=n?addDays(calDay,n):dayIn(US); openGame=null; render(); replaceNav();}
 });
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-info]'); if(!b) return;
@@ -979,7 +1061,7 @@ document.addEventListener('click',e=>{
   const i=document.getElementById('binfo'); if(i) i.textContent=b.dataset.info;
 });
 document.addEventListener('change',e=>{
-  if(e.target.id==='calpick'&&e.target.value){calDay=e.target.value;render();}
+  if(e.target.id==='calpick'&&e.target.value){calDay=e.target.value;render();replaceNav();}
   if(e.target.id==='newsteam'){newsTeam=e.target.value;render();}
 });
 
@@ -1026,7 +1108,7 @@ async function load(){
   }
   render();
 }
-load(); setInterval(load,REFRESH_MS);
+load().then(()=>{ history.replaceState(navState(),''); navReady=true; }); setInterval(load,REFRESH_MS);
 // ficha de un partido en directo: refrescar la estadística cada 30 s
 setInterval(()=>{ if(tab==='cal'&&openGame&&BOX.id===openGame&&!(BOX.data&&BOX.data.header&&BOX.data.header.competitions[0].status.type.state==='post')) render(); },30000);
 </script>

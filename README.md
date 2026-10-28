@@ -66,7 +66,7 @@ La clasificación solo cambia cuando **termina** un partido. No es en directo ju
 
 ### Gráfico de evolución
 
-- **Datos:** un punto por día, desde el 18/10/2026, que es cuando se empezó a guardar. Sale de `data/historial.json`, y el punto de hoy usa siempre la puntuación en vivo.
+- **Datos:** un punto por día, desde el primer día del historial con puntos de liga regular (sin `pre`), que es el 20/10/2026. Los días de pretemporada, todos a 0, no se dibujan. Sale de `data/historial.json`, y el punto de hoy usa siempre la puntuación en vivo.
 - **Eje:** está invertido, así que menos puntos aparecen más arriba.
 - **Fotos:** al final de cada línea sale la foto de cada uno con su puntuación. Si coinciden, se separan.
 
@@ -134,6 +134,24 @@ node scripts/update.mjs       # actualizar los datos a mano (necesita Node 18+)
 - **Sin filtro por jugador:** la API lo ignora. Lo probamos con `athlete`, `athletes`, `athleteId` y `player`, y `athletes/<id>/news` da error.
 - **En español:** existe con `&lang=es&region=us` (ESPN Deportes), pero se eligió inglés porque hay más noticias y llegan antes.
 
+## Clasificación (pestaña)
+
+- **Temporada:** Este y Oeste, con lo apostado por cada uno y los puntos que suma.
+  - En el móvil (≤ 600 px) solo salen el escudo, PJ, G, P y la foto de cada participante. Se ocultan Racha y Últ. 10 para que quepa todo; siguen en la página del equipo.
+- **🏆 Copa NBA:** clasificación de la fase de grupos.
+  - **Cómo se sacan los grupos:** ESPN marca los partidos con la nota `NBA Cup - Group Play`, pero no dice el grupo. Cada equipo juega contra los otros 4 de su grupo, así que los grupos se deducen de esos cruces (componentes conexos): salen 6 grupos de 5.
+  - **Nombres:** no se conoce el nombre oficial (A/B/C), así que van numerados por conferencia.
+  - **Orden:** victorias, enfrentamiento directo (solo si empatan dos), diferencia de puntos y puntos a favor.
+  - **Clasificados:** se marca el 1º de cada grupo y el comodín, que es el mejor 2º de cada conferencia.
+  - **Caras:** indican quién apostó por ese equipo para ganar la copa.
+  - **Eliminatorias:** aparecen cuando ESPN las añade al calendario, con notas `NBA Cup - …` que no sean de grupos.
+
+## Botón Atrás del móvil
+
+- **Cómo funciona:** cada cambio de pantalla (pestaña, página de equipo o jugador, ficha de partido) se apunta en el historial del navegador (`history.pushState`). Así, el botón Atrás del móvil vuelve a la pantalla anterior en vez de salir de la web.
+- **Lo que no apunta:** cambiar de día en el calendario o de filtro solo actualiza la entrada actual (`replaceState`), para que Atrás no recorra día a día.
+- **Botones "← Volver":** usan `history.back()`, así que hacen lo mismo que el botón Atrás.
+
 ## Páginas de equipo y de jugador
 
 En **cualquier pestaña**:
@@ -158,7 +176,12 @@ En **cualquier pestaña**:
 
 ## Líderes
 
-- **Origen:** la pestaña Líderes muestra el top 10 de jugadores y de equipos en puntos totales, puntos, asistencias, rebotes, eficiencia y robos por partido.
+- **Origen:** la pestaña Líderes muestra el top 10 de cada categoría.
+  - **Jugadores:** puntos totales, puntos, asistencias y rebotes por partido, triples metidos (total), eficiencia, % de tiro real (TS%) y robos por partido.
+  - **Equipos:** las mismas categorías, más puntos en contra por partido, ordenados de menos a más.
+  - **Definición de cada categoría:** en `LEADER_CATS` de `scripts/update.mjs`, como `[clave, título, menos es mejor, unidad]`.
+  - **TS%:** puntos / (2 × (tiros de campo + 0,44 × libres)). En jugadores exige además 8 tiros de campo por partido.
+  - **Puntos en contra:** salen de la estadística del rival (`splitId: "900"`).
   - Sale de `data/lideres.json`, unos 6 KB.
   - Lo calcula el script cada 6 horas, junto con las plantillas.
 - **Jugadores:** usa el mismo `byathlete` que las plantillas. Para las medias hay que haber jugado al menos el 70 % de los partidos del que más ha jugado, que es la regla aproximada de la NBA. Los puntos totales no tienen mínimo.
